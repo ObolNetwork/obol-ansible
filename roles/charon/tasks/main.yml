@@ -1,12 +1,12 @@
 - name: Create charon-node directory
   ansible.builtin.file:
-    path: ~/charon-node
+    path: ~/node-{{ nodeIndex }}
     state: directory
     mode: '775'
 
 - name: Create .charon directory
   ansible.builtin.file:
-    path: ~/charon-node/.charon
+    path: ~/node-{{ nodeIndex }}/.charon
     state: directory
     mode: '775'
 
@@ -14,21 +14,21 @@
   ansible.builtin.copy:
     remote_src: true
     src: '{{ config.validatorKeysDir }}'
-    dest: ~/charon-node/.charon/validator_keys
+    dest: ~/node-{{ nodeIndex }}/.charon/validator_keys
     mode: '777'
 
 - name: Copy charon-enr-private-key
   ansible.builtin.copy:
     remote_src: true
     src: '{{ config.privateKeyFile }}'
-    dest: ~/charon-node/charon-enr-private-key
+    dest: ~/node-{{ nodeIndex }}/charon-enr-private-key
     mode: '777'
 
 - name: Copy cluster-lock.json
   ansible.builtin.copy:
     remote_src: true
     src: '{{ config.LockFile }}'
-    dest: ~/charon-node/cluster-lock.json
+    dest: ~/node-{{ nodeIndex }}/cluster-lock.json
     mode: '777'
 
 - name: Pull default charon image
