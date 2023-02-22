@@ -1,0 +1,9 @@
+---
+
+- name: A playbook that creates a charon node
+  hosts: all
+  gather_facts: false
+  become: false
+
+  roles:
+    - charon

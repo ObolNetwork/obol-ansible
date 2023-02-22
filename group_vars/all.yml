@@ -1,0 +1,98 @@
+---
+# -- The version of charon to run. (default "v0.13.0")
+imageVersion: "v0.13.0"
+
+# -- The index of the node that is being run. (default "0")
+nodeIndex: "0"
+
+## Charon command line options
+## ref: https://docs.obol.tech/docs/charon/charon_cli_reference
+config:
+  # -- The path to the validator keys folder. (default ".charon/charon-enr-private-key")
+  validatorKeysDir: ".charon/validator_keys"
+
+  # -- The path to the charon enr private key file. (default ".charon/charon-enr-private-key")
+  privateKeyFile: ".charon/charon-enr-private-key"
+
+  # -- The path to the cluster lock file defining distributed validator cluster. (default ".charon/cluster-lock.json")
+  LockFile: ".charon/cluster-lock.json"
+
+  # -- Comma separated list of one or more beacon node endpoint URLs.
+  beaconNodeEndpoints: ""
+
+  # -- Enables the builder api. Will only produce builder blocks. Builder API must also be enabled on the validator client.
+  # Beacon node must be connected to a builder-relay to access the builder network.
+  builderApi: ""
+
+  # -- Minimum feature set to enable by default: alpha, beta, or stable. Warning: modify at own risk. (default "stable")
+  featureSet: "stable"
+
+  # -- Comma-separated list of features to disable, overriding the default minimum feature set.
+  featureSetDisable: ""
+
+  # -- Comma-separated list of features to enable, overriding the default minimum feature set.
+  featureSetEnable: ""
+
+  # -- Listening address for jaeger tracing.
+  jaegerAddress: "jaeger:6831"
+
+  # -- Service name used for jaeger tracing. (default "charon")
+  jaegerService: "charon"
+
+  # -- Log format; console, logfmt or json (default "console")
+  logFormat: "json"
+
+  # -- Log level; debug, info, warn or error (default "info")
+  logLevel: "info"
+
+  # -- Enables sending of logfmt structured logs to these Loki log aggregation server addresses. This is in addition to normal
+  # stderr logs.
+  lokiAddresses: ""
+
+  # -- Service label sent with logs to Loki. (default "charon")
+  lokiService: "charon"
+
+  # -- Listening address (ip and port) for the monitoring API (prometheus, pprof). (default "127.0.0.1:3620")
+  monitoringAddress: "0.0.0.0:3620"
+
+  # -- Disables cluster definition and lock file verification.
+  noVerify: "false"
+
+  # -- Comma-separated list of CIDR subnets for allowing only certain peer connections. Example: 192.168.0.0/16 would permit
+  # connections to peers on your local network only. The default is to accept all connections.
+  p2pAllowlist: ""
+
+  # -- Comma-separated list of CIDR subnets for disallowing certain peer connections. Example: 192.168.0.0/16 would disallow
+  # connections to peers on your local network. The default is to accept all connections.
+  p2pDenylist: ""
+
+  # -- Disables TCP port reuse for outgoing libp2p connections.
+  p2pDisableReuseport: ""
+
+  # -- The DNS hostname advertised by libp2p. This may be used to advertise an external DNS.
+  p2pExternalHostname: ""
+
+  # -- The IP address advertised by libp2p. This may be used to advertise an external IP.
+  p2pExternalIp: ""
+
+  # -- Comma-separated list of libp2p relay URLs or multiaddrs. (default [https://0.relay.obol.tech/enr,http://bootnode.lb.gcp.obol.tech:3640/enr])
+  p2pRelays: "https://0.relay.obol.tech/enr,http://bootnode.lb.gcp.obol.tech:3640/enr"
+
+  # -- Comma-separated list of listening TCP addresses (ip and port) for libP2P traffic. Empty default doesn't bind to local port
+  # therefore only supports outgoing connections.
+  p2pTcpAddress: "0.0.0.0:3610"
+
+  # -- Enables an internal mock beacon node for running a simnet.
+  simnetBeaconMock: ""
+
+  # -- The directory containing the simnet validator key shares. (default ".charon/validator_keys")
+  simnetValidatorKeysDir: ""
+
+  # -- Enables an internal mock validator client when running a simnet. Requires simnet-beacon-mock.
+  simnetValidatorMock: ""
+
+  # -- Enables additional synthetic block proposal duties. Used for testing of rare duties.
+  syntheticBlockProposals: ""
+
+  # -- Listening address (ip and port) for validator-facing traffic proxying the beacon-node API. (default "127.0.0.1:3600")
+  validatorApiAddress: "0.0.0.0:3600"
