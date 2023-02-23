@@ -15,7 +15,7 @@ config:
   privateKeyFile: ".charon/charon-enr-private-key"
 
   # -- The path to the cluster lock file defining distributed validator cluster. (default ".charon/cluster-lock.json")
-  LockFile: ".charon/cluster-lock.json"
+  lockFile: ".charon/cluster-lock.json"
 
   # -- Comma separated list of one or more beacon node endpoint URLs.
   beaconNodeEndpoints: ""

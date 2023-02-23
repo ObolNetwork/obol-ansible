@@ -6,4 +6,5 @@
   become: false
 
   roles:
+    - docker-install
     - charon

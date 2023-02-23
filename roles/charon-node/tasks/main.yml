@@ -14,7 +14,7 @@
   ansible.builtin.copy:
     remote_src: true
     src: '{{ config.validatorKeysDir }}'
-    dest: ~/node-{{ nodeIndex }}/.charon/validator_keys
+    dest: ~/node-{{ nodeIndex }}/validator_keys
     mode: '777'
 
 - name: Copy charon-enr-private-key
@@ -27,9 +27,24 @@
 - name: Copy cluster-lock.json
   ansible.builtin.copy:
     remote_src: true
-    src: '{{ config.LockFile }}'
+    src: '{{ config.lockFile }}'
     dest: ~/node-{{ nodeIndex }}/cluster-lock.json
     mode: '777'
+
+- name: Retrieve full path of validator keys
+  ansible.builtin.command: realpath ~/node-{{ nodeIndex }}/validator_keys
+  register: validator_keys
+  changed_when: validator_keys.stdout != ''
+
+- name: Retrieve full path of private key
+  ansible.builtin.command: realpath ~/node-{{ nodeIndex }}/charon-enr-private-key
+  register: private_key
+  changed_when: private_key.stdout != ''
+
+- name: Retrieve full path of cluster lock
+  ansible.builtin.command: realpath ~/node-{{ nodeIndex }}/cluster-lock.json
+  register: cluster_lock
+  changed_when: cluster_lock.stdout != ''
 
 - name: Pull default charon image
   community.docker.docker_image:
@@ -41,7 +56,11 @@
     image: obolnetwork/charon:{{ imageVersion }}
     name: charon
     recreate: true
-    command: /usr/local/bin/charon run
+    command: run
+    volumes:
+      - '{{ validator_keys.stdout }}:/charon/validator_keys'
+      - '{{ private_key.stdout }}:/charon/charon-enr-private-key'
+      - '{{ cluster_lock.stdout }}:/charon/cluster-lock.json'
     env:
       CHARON_BEACON_NODE_ENDPOINTS: '{{ config.beaconNodeEndpoints | default(omit) }}'
       CHARON_BUILDER_API: '{{ config.builderApi | default(omit) }}'
@@ -50,7 +69,7 @@
       CHARON_FEATURE_SET_ENABLE: '{{ config.featureSetEnable | default(omit) }}'
       CHARON_JAEGER_ADDRESS: '{{ config.jaegerAddress | default(omit) }}'
       CHARON_JAEGER_SERVICE: '{{ config.jaegerService | default(omit) }}'
-      CHARON_LOCK_FILE: '~/node-{{ nodeIndex }}/cluster-lock.json'
+      CHARON_LOCK_FILE: '/charon/cluster-lock.json'
       CHARON_LOG_FORMAT: '{{ config.logFormat | default(omit) }}'
       CHARON_LOG_LEVEL: '{{ config.logLevel | default(omit) }}'
       CHARON_LOKI_ADDRESSES: '{{ config.lokiAddresses | default(omit) }}'
@@ -64,7 +83,7 @@
       CHARON_P2P_EXTERNAL_IP: '{{ config.p2pExternalIp | default(omit) }}'
       CHARON_P2P_RELAYS: '{{ config.p2pRelays | default(omit) }}'
       CHARON_P2P_TCP_ADDRESS: '{{ config.p2pTcpAddress | default(omit) }}'
-      CHARON_PRIVATE_KEY_FILE: '~/node-{{ nodeIndex }}/charon-enr-private-key'
+      CHARON_PRIVATE_KEY_FILE: '/charon/charon-enr-private-key'
       CHARON_SIMNET_BEACON_MOCK: '{{ config.simnetBeaconMock | default(omit) }}'
       CHARON_SIMNET_VALIDATOR_KEYS_DIR: '{{ config.simnetValidatorKeysDir | default(omit) }}'
       CHARON_SIMNET_VALIDATOR_MOCK: '{{ config.simnetValidatorMock | default(omit) }}'
