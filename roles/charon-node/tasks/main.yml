@@ -54,7 +54,7 @@
 - name: Create charon container
   community.docker.docker_container:
     image: obolnetwork/charon:{{ imageVersion }}
-    name: charon
+    name: 'charon-{{ nodeIndex }}'
     recreate: true
     command: run
     volumes:

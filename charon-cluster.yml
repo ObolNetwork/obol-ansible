@@ -1,0 +1,10 @@
+---
+
+- name: A playbook that creates a charon cluster
+  hosts: all
+  gather_facts: false
+  become: false
+
+  roles:
+    - docker-install
+    - charon-cluster
