@@ -1,6 +1,6 @@
 - name: Find charon folders
   find:
-    paths: /Users/lukehackett/Documents/Obol/obol-ansible/.charon/cluster
+    paths: ./.charon/cluster
     file_type: directory
     recurse: false
     patterns: 'node*'
