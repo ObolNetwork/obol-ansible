@@ -1,0 +1,98 @@
+---
+# -- The version of charon to run. (default "v0.13.0")
+node_image_version: 'v0.13.0'
+
+# -- The index of the node that is being run. (default "0")
+node_index: '0'
+
+## Charon command line options
+## ref: https://docs.obol.tech/docs/charon/charon_cli_reference
+node_config:
+  # -- The path to the validator keys folder. (default ".charon/validator_keys/")
+  validator_keys_dir: '.charon/validator_keys'
+
+  # -- The path to the charon enr private key file. (default ".charon/charon-enr-private-key")
+  private_key_file: '.charon/charon-enr-private-key'
+
+  # -- The path to the cluster lock file defining distributed validator cluster. (default ".charon/cluster-lock.json")
+  lock_file: './.charon/cluster-lock.json'
+
+  # -- Comma separated list of one or more beacon node endpoint URLs.
+  beacon_node_endpoints: "{{ undef(hint='You must specify your beacon node endpoints') }}"
+
+  # -- Enables the builder api. Will only produce builder blocks. Builder API must also be enabled on the validator client.
+  # Beacon node must be connected to a builder-relay to access the builder network.
+  builder_api: ''
+
+  # -- Minimum feature set to enable by default: alpha, beta, or stable. Warning: modify at own risk. (default "stable")
+  feature_set: 'stable'
+
+  # -- Comma-separated list of features to disable, overriding the default minimum feature set.
+  feature_set_disable: ''
+
+  # -- Comma-separated list of features to enable, overriding the default minimum feature set.
+  feature_set_enable: ''
+
+  # -- Listening address for jaeger tracing.
+  jaeger_address: 'jaeger:6831'
+
+  # -- Service name used for jaeger tracing. (default "charon")
+  jaeger_service: 'charon'
+
+  # -- Log format; console, logfmt or json (default "console")
+  log_format: 'json'
+
+  # -- Log level; debug, info, warn or error (default "info")
+  log_level: 'info'
+
+  # -- Enables sending of logfmt structured logs to these Loki log aggregation server addresses. This is in addition to normal
+  # stderr logs.
+  loki_addresses: ''
+
+  # -- Service label sent with logs to Loki. (default "charon")
+  loki_service: 'charon'
+
+  # -- Listening address (ip and port) for the monitoring API (prometheus, pprof). (default "127.0.0.1:3620")
+  monitoring_address: '0.0.0.0:3620'
+
+  # -- Disables cluster definition and lock file verification.
+  no_verify: 'false'
+
+  # -- Comma-separated list of CIDR subnets for allowing only certain peer connections. Example: 192.168.0.0/16 would permit
+  # connections to peers on your local network only. The default is to accept all connections.
+  p2p_allowlist: ''
+
+  # -- Comma-separated list of CIDR subnets for disallowing certain peer connections. Example: 192.168.0.0/16 would disallow
+  # connections to peers on your local network. The default is to accept all connections.
+  p2p_denylist: ''
+
+  # -- Disables TCP port reuse for outgoing libp2p connections.
+  p2p_disable_reuseport: ''
+
+  # -- The DNS hostname advertised by libp2p. This may be used to advertise an external DNS.
+  p2p_external_hostname: ''
+
+  # -- The IP address advertised by libp2p. This may be used to advertise an external IP.
+  p2p_external_ip: ''
+
+  # -- Comma-separated list of libp2p relay URLs or multiaddrs. (default [https://0.relay.obol.tech/enr,http://bootnode.lb.gcp.obol.tech:3640/enr])
+  p2p_relays: 'https://0.relay.obol.tech/enr,http://bootnode.lb.gcp.obol.tech:3640/enr'
+
+  # -- Comma-separated list of listening TCP addresses (ip and port) for libP2P traffic. Empty default doesn't bind to local port
+  # therefore only supports outgoing connections.
+  p2p_tcp_address: '0.0.0.0:3610'
+
+  # -- Enables an internal mock beacon node for running a simnet.
+  simnet_beacon_mock: ''
+
+  # -- The directory containing the simnet validator key shares. (default ".charon/validator_keys")
+  simnet_validator_keys_dir: ''
+
+  # -- Enables an internal mock validator client when running a simnet. Requires simnet-beacon-mock.
+  simnet_validator_mock: ''
+
+  # -- Enables additional synthetic block proposal duties. Used for testing of rare duties.
+  synthetic_block_proposals: ''
+
+  # -- Listening address (ip and port) for validator-facing traffic proxying the beacon-node API. (default "127.0.0.1:3600")
+  validator_api_address: '0.0.0.0:3600'
