@@ -10,9 +10,9 @@
   ansible.builtin.include_role:
     name: charon-node
   vars:
-    nodeIndex: '{{ item.0 }}'
-    config:
-      lockFile: '{{ item.1.path }}/cluster-lock.json'
-      privateKeyFile: '{{ item.1.path }}/charon-enr-private-key'
-      validatorKeysDir: '{{ item.1.path }}/validator_keys/'
+    node_index: '{{ item.0 }}'
+    node_config:
+      lock_file: '{{ item.1.path }}/cluster-lock.json'
+      private_key_file: '{{ item.1.path }}/charon-enr-private-key'
+      validator_keys_dir: '{{ item.1.path }}/validator_keys/'
   with_indexed_items: '{{ node_folders.files }}'
