@@ -44,6 +44,10 @@ You have the followin charon node artifacts generated locally under a .charon fo
 ansible-playbook -e config.beacon_node_endpoints=<beacon_node_endpoints> -i <hosts.yml> charon-node.yml
 ```
 
+### Connect the validator client
+
+- Update the validator client to connect to charon node API endpoint instead of the beacon node endpoint --beacon-node-api-endpoint="http://charon0:3600"
+
 ### Charon Cluster
 
 A distributed validator cluster is a docker-compose file with the following containers running:
@@ -69,3 +73,7 @@ You have the followin charon artifacts generated locally under a .charon folder 
 ```
 ansible-playbook -e config.beacon_node_endpoints=<beacon_node_endpoints> -i <hosts.yml> charon-cluster.yml
 ```
+
+### Connect the validator client
+
+- Update each validator client to connect to charon node API endpoint instead of the beacon node endpoint --beacon-node-api-endpoint="http://charon`<node-index>`:3600"
