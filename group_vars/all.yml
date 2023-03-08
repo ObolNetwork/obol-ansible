@@ -1,6 +1,6 @@
 ---
-# -- The version of charon to run. (default "v0.13.0")
-node_image_version: 'v0.13.0'
+# -- The version of charon to run. (default "v0.14.0")
+node_image_version: 'v0.14.0'
 
 # -- The index of the node that is being run. (default "0")
 node_index: '0'
