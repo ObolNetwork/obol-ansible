@@ -4,6 +4,7 @@
     file_type: directory
     recurse: false
     patterns: 'node*'
+  delegate_to: localhost
   register: node_folders
 
 - name: Loop through cluster folders
