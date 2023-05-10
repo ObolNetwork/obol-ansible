@@ -5,8 +5,8 @@ Obol's Ansible Playbooks
 
 ## Available playbooks
 
-- [`charon-node`](charon-node.yml)
-- [`charon-cluster`](charon-cluster.yml)
+- [`charon_node`](charon_node.yml)
+- [`charon_cluster`](charon_cluster.yml)
 
 ## Before you begin
 
@@ -67,6 +67,14 @@ You have the followin charon artifacts generated locally under a .charon folder 
 - nodeX/validator-keys
 - nodeX/charon-enr-private-key
 - nodeX/cluster-lock
+
+### Install dependancies
+
+Install the dependant ansible packages by running:
+
+```
+ansible-galaxy install -r requirements.yml
+```
 
 ### Run the role
 

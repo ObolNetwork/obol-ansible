@@ -1,4 +1,4 @@
-- name: Find charon folders
+- name: Find_charon_clusters
   find:
     paths: ./.charon/cluster
     file_type: directory
@@ -7,9 +7,9 @@
   delegate_to: localhost
   register: node_folders
 
-- name: Loop through cluster folders
+- name: Loop_cluster_folders
   ansible.builtin.include_role:
-    name: charon-node
+    name: charon_node
   vars:
     node_index: '{{ item.0 }}'
     node_config:

@@ -1,0 +1,5 @@
+- repo: https://github.com/ansible-community/ansible-lint.git
+  rev: v6.15.0
+  hooks:
+    - id: ansible-lint
+      files: \.(yaml|yml)$

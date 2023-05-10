@@ -15,6 +15,6 @@
   roles:
     - name: Install Docker
       when: docker_valid.failed
-      role: docker-install
+      role: docker_install
     - name: Setup and run charon-node
-      role: charon-node
+      role: charon_node

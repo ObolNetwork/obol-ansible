@@ -9,21 +9,21 @@
     remote_src: false
     directory_mode: true
     src: '{{ node_config.validator_keys_dir }}'
-    dest: ~/node-{{ node_index }}/validator_keys
+    dest: ~/node-{{ node_index }}/
     mode: '777'
 
 - name: Copy charon-enr-private-key
   ansible.builtin.copy:
     remote_src: false
     src: '{{ node_config.private_key_file }}'
-    dest: ~/node-{{ node_index }}/charon-enr-private-key
+    dest: ~/node-{{ node_index }}/
     mode: '777'
 
 - name: Copy cluster-lock.json
   ansible.builtin.copy:
     remote_src: false
     src: '{{ node_config.lock_file }}'
-    dest: ~/node-{{ node_index }}/cluster-lock.json
+    dest: ~/node-{{ node_index }}/
     mode: '777'
 
 - name: Retrieve full path of validator keys
