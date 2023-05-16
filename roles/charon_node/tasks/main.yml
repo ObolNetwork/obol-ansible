@@ -1,0 +1,90 @@
+- name: Create charon-node directory
+  ansible.builtin.file:
+    path: ~/node-{{ node_index }}
+    state: directory
+    mode: '775'
+
+- name: Copy validator_keys folder
+  ansible.builtin.copy:
+    remote_src: false
+    directory_mode: true
+    src: '{{ validator_keys_dir }}'
+    dest: ~/node-{{ node_index }}/
+    mode: '777'
+
+- name: Copy charon-enr-private-key
+  ansible.builtin.copy:
+    remote_src: false
+    src: '{{ private_key_file }}'
+    dest: ~/node-{{ node_index }}/
+    mode: '777'
+
+- name: Copy cluster-lock.json
+  ansible.builtin.copy:
+    remote_src: false
+    src: '{{ lock_file }}'
+    dest: ~/node-{{ node_index }}/
+    mode: '777'
+
+- name: Retrieve full path of validator keys
+  ansible.builtin.command: realpath ~/node-{{ node_index }}/validator_keys
+  register: validator_keys
+  changed_when: validator_keys.stdout != ''
+
+- name: Retrieve full path of private key
+  ansible.builtin.command: realpath ~/node-{{ node_index }}/charon-enr-private-key
+  register: private_key
+  changed_when: private_key.stdout != ''
+
+- name: Retrieve full path of cluster lock
+  ansible.builtin.command: realpath ~/node-{{ node_index }}/cluster-lock.json
+  register: cluster_lock
+  changed_when: cluster_lock.stdout != ''
+
+- name: Pull default charon image
+  community.docker.docker_image:
+    name: obolnetwork/charon:{{ node_image_version }}
+    source: pull
+
+- name: Create charon container
+  community.docker.docker_container:
+    image: obolnetwork/charon:{{ node_image_version }}
+    name: 'charon-{{ node_index }}'
+    recreate: true
+    command: run
+    volumes:
+      - '{{ validator_keys.stdout }}:/charon/validator_keys'
+      - '{{ private_key.stdout }}:/charon/charon-enr-private-key'
+      - '{{ cluster_lock.stdout }}:/charon/cluster-lock.json'
+    env:
+      CHARON_BEACON_NODE_ENDPOINTS: '{{ beacon_node_endpoints | default(omit) }}'
+      CHARON_BUILDER_API: '{{ builder_api | default(omit) }}'
+      CHARON_FEATURE_SET: '{{ feature_set | default(omit) }}'
+      CHARON_FEATURE_SET_DISABLE: '{{ feature_set_disable | default(omit) }}'
+      CHARON_FEATURE_SET_ENABLE: '{{ feature_set_enable | default(omit) }}'
+      CHARON_JAEGER_ADDRESS: '{{ jaeger_address | default(omit) }}'
+      CHARON_JAEGER_SERVICE: '{{ jaeger_service | default(omit) }}'
+      CHARON_LOCK_FILE: '/charon/cluster-lock.json'
+      CHARON_LOG_FORMAT: '{{ log_format | default(omit) }}'
+      CHARON_LOG_LEVEL: '{{ log_level | default(omit) }}'
+      CHARON_LOKI_ADDRESSES: '{{ loki_addresses | default(omit) }}'
+      CHARON_LOKI_SERVICE: '{{ loki_service | default(omit) }}'
+      CHARON_MONITORING_ADDRESS: '{{ monitoring_address | default(omit) }}'
+      CHARON_NO_VERIFY: '{{ no_verify | default(omit) }}'
+      CHARON_P2P_ALLOWLIST: '{{ p2p_allowlist | default(omit) }}'
+      CHARON_P2P_DENYLIST: '{{ p2p_denylist | default(omit) }}'
+      CHARON_P2P_DISABLE_REUSEPORT: '{{ p2p_disable_reuseport | default(omit) }}'
+      CHARON_P2P_EXTERNAL_HOSTNAME: '{{ p2p_external_hostname | default(omit) }}'
+      CHARON_P2P_EXTERNAL_IP: '{{ p2p_external_ip | default(omit) }}'
+      CHARON_P2P_RELAYS: '{{ p2p_relays | default(omit) }}'
+      CHARON_P2P_TCP_ADDRESS: '{{ p2p_tcp_address | default(omit) }}'
+      CHARON_PRIVATE_KEY_FILE: '/charon/charon-enr-private-key'
+      CHARON_SIMNET_BEACON_MOCK: '{{ simnet_beacon_mock | default(omit) }}'
+      CHARON_SIMNET_VALIDATOR_KEYS_DIR: '{{ simnet_validator_keys_dir | default(omit) }}'
+      CHARON_SIMNET_VALIDATOR_MOCK: '{{ simnet_validator_mock | default(omit) }}'
+      CHARON_SYNTHETIC_BLOCK_PROPOSALS: '{{ synthetic_block_proposals | default(omit) }}'
+      CHARON_VALIDATOR_API_ADDRESS: '{{ validator_api_address | default(omit) }}'
+    exposed_ports:
+      - '3610'
+    ports:
+      - '3610:3610'

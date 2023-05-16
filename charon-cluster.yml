@@ -13,5 +13,5 @@
       changed_when: docker_valid != 0
 
   roles:
-    - docker-install
-    - charon-cluster
+    - docker_install
+    - charon_cluster
