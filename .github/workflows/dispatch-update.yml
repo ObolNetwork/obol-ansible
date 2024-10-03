@@ -1,0 +1,35 @@
+name: Dispatch Update Version
+
+on:
+  repository_dispatch:
+    types: [update-version]
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+
+      - name: Extract tag name
+        run: echo "TAG_NAME=${{ github.event.client_payload.tag }}" >> $GITHUB_ENV
+
+      - name: Update version in Ansible configuration
+        run: |
+          TAG_NAME="${{ env.TAG_NAME#v }}"
+          sed -i -E "s/^node_image_version: 'v\.?[0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9\-]*'/node_image_version: 'v${TAG_NAME}'/" group_vars/all.yml
+
+          # Commit and push changes
+          git checkout -b update-version-${{ env.TAG_NAME }}
+          git add .
+          git commit -m "Update version to ${TAG_NAME}"
+          git push origin update-version-${{ env.TAG_NAME }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
+          head: update-version-${{ env.TAG_NAME }}
+          title: "Update version to ${{ env.TAG_NAME }}"
+          body: "Automatically generated PR to update version to ${{ env.TAG_NAME }}"
