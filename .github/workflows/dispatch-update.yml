@@ -16,7 +16,8 @@ jobs:
 
       - name: Update version in Ansible configuration
         run: |
-          TAG_NAME="${{ env.TAG_NAME#v }}"
+          TAG_NAME="$(echo "${TAG_NAME}" | sed 's/^v//')"
+
           sed -i -E "s/^node_image_version: 'v\.?[0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9\-]*'/node_image_version: 'v${TAG_NAME}'/" group_vars/all.yml
 
           # Commit and push changes
