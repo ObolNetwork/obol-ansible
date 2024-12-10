@@ -2,3 +2,6 @@ skip_list:
   - package-latest
   - fqcn[action]
   - fqcn[action-core]
+  - var-naming[no-role-prefix]
+exclude_paths:
+  - .github/
