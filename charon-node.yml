@@ -10,7 +10,7 @@
       command: docker --version
       register: docker_valid
       ignore_errors: true
-      changed_when: docker_valid != 0
+      changed_when: docker_valid.rc != 0
 
   roles:
     - name: Install Docker
@@ -18,3 +18,25 @@
       role: docker_install
     - name: Setup and run charon-node
       role: charon_node
+
+  post_tasks:
+    - name: Define available validator clients
+      ansible.builtin.set_fact:
+        __charon_node_validator_role_map:
+          lodestar: validator_lodestar
+
+    - name: Validate requested validator client
+      ansible.builtin.assert:
+        that:
+          - (charon_node_validator_client | default('')) == '' or charon_node_validator_client in __charon_node_validator_role_map
+        fail_msg: "Unsupported charon_node_validator_client '{{ charon_node_validator_client | default('', true) }}'. Supported clients: {{ __charon_node_validator_role_map.keys() | list | join(', ') }}."
+
+    - name: Run validator client '{{ charon_node_validator_client }}'
+      ansible.builtin.include_role:
+        name: "{{ __charon_node_validator_role_map[charon_node_validator_client] }}"
+      vars:
+        validator_keys_path: "{{ charon_node_validator_keys_path }}"
+        validator_api_port: "{{ charon_node_validator_api_port }}"
+        validator_node_index: "{{ node_index }}"
+        charon_network_name: "{{ charon_node_docker_network }}"
+      when: charon_node_validator_client | default('') != ''

@@ -1,0 +1,70 @@
+---
+- name: lodestar | Validate required inputs
+  ansible.builtin.assert:
+    that:
+      - validator_keys_path is defined
+      - (validator_keys_path | length) > 0
+      - validator_api_port is defined
+      - validator_node_index is defined
+      - charon_network_name is defined
+    fail_msg: 'validator_keys_path, validator_api_port, validator_node_index, and charon_network_name must be provided to the validator_lodestar role.'
+
+- name: lodestar | Ensure directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '750'
+  loop:
+    - "{{ validator_lodestar_base_dir }}"
+    - "{{ validator_lodestar_data_dir }}"
+
+- name: lodestar | Deploy run script
+  ansible.builtin.copy:
+    src: run.sh
+    dest: "{{ validator_lodestar_base_dir }}/run.sh"
+    mode: '755'
+
+- name: lodestar | Gather run script path
+  ansible.builtin.stat:
+    path: "{{ validator_lodestar_base_dir }}/run.sh"
+    follow: true
+  register: __validator_lodestar_run_script
+
+- name: lodestar | Gather data directory path
+  ansible.builtin.stat:
+    path: "{{ validator_lodestar_data_dir }}"
+    follow: true
+  register: __validator_lodestar_data_dir_stat
+
+- name: lodestar | Validate assets
+  ansible.builtin.assert:
+    that:
+      - __validator_lodestar_run_script.stat.exists
+      - __validator_lodestar_data_dir_stat.stat.exists
+    fail_msg: 'Lodestar run script or data directory missing; ensure files copied correctly.'
+
+- name: lodestar | Pull container image
+  community.docker.docker_image:
+    name: chainsafe/lodestar:{{ validator_lodestar_image_version }}
+    source: pull
+
+- name: lodestar | Run validator container
+  community.docker.docker_container:
+    image: chainsafe/lodestar:{{ validator_lodestar_image_version }}
+    name: "{{ validator_lodestar_container_name }}"
+    recreate: true
+    entrypoint: /opt/lodestar/run.sh
+    networks:
+      - name: '{{ charon_network_name }}'
+        aliases:
+          - 'lodestar-{{ validator_node_index }}'
+    env:
+      BEACON_NODE_ADDRESS: "{{ validator_lodestar_beacon_node_address }}"
+      NETWORK: "{{ validator_lodestar_network }}"
+      BUILDER_API_ENABLED: "{{ validator_lodestar_builder_api_enabled | bool | ternary('true', 'false') }}"
+      BUILDER_SELECTION: "{{ validator_lodestar_builder_selection }}"
+    restart_policy: unless-stopped
+    volumes:
+      - "{{ __validator_lodestar_run_script.stat.path }}:/opt/lodestar/run.sh:ro"
+      - "{{ validator_keys_path }}:/home/charon/validator_keys:ro"
+      - "{{ __validator_lodestar_data_dir_stat.stat.path }}:/opt/data"
