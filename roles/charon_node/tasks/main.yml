@@ -41,6 +41,18 @@
   register: cluster_lock
   changed_when: cluster_lock.stdout != ''
 
+- name: Derive validator API port
+  ansible.builtin.set_fact:
+    __charon_node_validator_api_port: "{{ (validator_api_address | default('0.0.0.0:3600', true)).split(':')[-1] }}"
+
+- name: Set charon docker network name
+  ansible.builtin.set_fact:
+    __charon_node_docker_network: "charon-node-{{ node_index }}"
+
+- name: Ensure charon network exists
+  community.docker.docker_network:
+    name: "{{ __charon_node_docker_network }}"
+
 - name: Pull default charon image
   community.docker.docker_image:
     name: obolnetwork/charon:{{ node_image_version }}
@@ -52,6 +64,10 @@
     name: 'charon-{{ node_index }}'
     recreate: true
     command: run
+    networks:
+      - name: '{{ __charon_node_docker_network }}'
+        aliases:
+          - 'charon-{{ node_index }}'
     volumes:
       - '{{ validator_keys.stdout }}:/charon/validator_keys'
       - '{{ private_key.stdout }}:/charon/charon-enr-private-key'
@@ -88,3 +104,12 @@
       - '3610'
     ports:
       - '3610:3610'
+
+
+- name: Expose charon node shared facts
+  ansible.builtin.set_fact:
+    charon_node_validator_keys_path: "{{ validator_keys.stdout }}"
+    charon_node_private_key_path: "{{ private_key.stdout }}"
+    charon_node_cluster_lock_path: "{{ cluster_lock.stdout }}"
+    charon_node_validator_api_port: "{{ __charon_node_validator_api_port }}"
+    charon_node_docker_network: "{{ __charon_node_docker_network }}"
