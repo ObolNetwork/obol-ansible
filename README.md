@@ -44,9 +44,10 @@ You have the followin charon node artifacts generated locally under a .charon fo
 ansible-playbook -e config.beacon_node_endpoints=<beacon_node_endpoints> -i <hosts.yml> charon-node.yml
 ```
 
-### Connect the validator client
+### Validator client deployment
 
-- Update the validator client to connect to charon node API endpoint instead of the beacon node endpoint --beacon-node-api-endpoint="http://charon0:3600"
+- Set `charon_node_validator_client` in `group_vars/all.yml` (or host vars) to one of the supported clients (currently `lodestar`) to have the playbook run the matching validator role alongside charon.
+- Override Lodestar settings (`validator_lodestar_network`, `validator_lodestar_image_version`, endpoint variables, etc.) in your inventory or group vars if the defaults from `roles/validator_lodestar/defaults/main.yml` don’t match your target chain or networking layout.
 
 ### Charon Cluster
 
@@ -82,6 +83,6 @@ ansible-galaxy install -r requirements.yml
 ansible-playbook -e config.beacon_node_endpoints=<beacon_node_endpoints> -i <hosts.yml> charon-cluster.yml
 ```
 
-### Connect the validator client
+### Validator client deployment
 
-- Update each validator client to connect to charon node API endpoint instead of the beacon node endpoint --beacon-node-api-endpoint="http://charon`<node-index>`:3600"
+Refer to the Charon Node section.
