@@ -3,6 +3,10 @@
     path: ~/node-{{ node_index }}
     state: directory
     mode: '775'
+  tags:
+    - charon
+    - charon-node
+    - setup
 
 - name: Copy validator_keys folder
   ansible.builtin.copy:
@@ -11,6 +15,11 @@
     src: '{{ validator_keys_dir }}'
     dest: ~/node-{{ node_index }}/
     mode: '777'
+  tags:
+    - charon
+    - charon-node
+    - configuration
+    - keys
 
 - name: Copy charon-enr-private-key
   ansible.builtin.copy:
@@ -18,6 +27,11 @@
     src: '{{ private_key_file }}'
     dest: ~/node-{{ node_index }}/
     mode: '777'
+  tags:
+    - charon
+    - charon-node
+    - configuration
+    - keys
 
 - name: Copy cluster-lock.json
   ansible.builtin.copy:
@@ -25,26 +39,47 @@
     src: '{{ lock_file }}'
     dest: ~/node-{{ node_index }}/
     mode: '777'
+  tags:
+    - charon
+    - charon-node
+    - configuration
 
 - name: Retrieve full path of validator keys
   ansible.builtin.command: realpath ~/node-{{ node_index }}/validator_keys
   register: validator_keys
   changed_when: validator_keys.stdout != ''
+  tags:
+    - charon
+    - charon-node
+    - configuration
 
 - name: Retrieve full path of private key
   ansible.builtin.command: realpath ~/node-{{ node_index }}/charon-enr-private-key
   register: private_key
   changed_when: private_key.stdout != ''
+  tags:
+    - charon
+    - charon-node
+    - configuration
 
 - name: Retrieve full path of cluster lock
   ansible.builtin.command: realpath ~/node-{{ node_index }}/cluster-lock.json
   register: cluster_lock
   changed_when: cluster_lock.stdout != ''
+  tags:
+    - charon
+    - charon-node
+    - configuration
 
 - name: Pull default charon image
   community.docker.docker_image:
     name: obolnetwork/charon:{{ node_image_version }}
     source: pull
+  tags:
+    - charon
+    - charon-node
+    - docker
+    - pull
 
 - name: Create charon container
   community.docker.docker_container:
@@ -88,3 +123,9 @@
       - '3610'
     ports:
       - '3610:3610'
+    networks:
+      - name: "{{ docker_network_name }}"
+  tags:
+    - charon
+    - charon-node
+    - deploy

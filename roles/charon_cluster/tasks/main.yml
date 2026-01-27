@@ -6,6 +6,10 @@
     patterns: 'node*'
   delegate_to: localhost
   register: node_folders
+  tags:
+    - charon
+    - charon-cluster
+    - discovery
 
 - name: Loop_cluster_folders
   ansible.builtin.include_role:
@@ -17,3 +21,7 @@
       private_key_file: '{{ item.1.path }}/charon-enr-private-key'
       validator_keys_dir: '{{ item.1.path }}/validator_keys/'
   with_indexed_items: '{{ node_folders.files }}'
+  tags:
+    - charon
+    - charon-cluster
+    - deploy

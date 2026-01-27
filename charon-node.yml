@@ -11,10 +11,57 @@
       register: docker_valid
       ignore_errors: true
       changed_when: docker_valid != 0
+      tags:
+        - always
 
   roles:
     - name: Install Docker
       when: docker_valid.failed
       role: docker_install
+      tags:
+        - docker
+        - setup
+    - name: Ensure docker network
+      role: docker_network
+      tags:
+        - docker
+        - network
+        - setup
+    - name: Deploy mev-boost
+      role: mev_boost
+      when: deploy_mev_boost | default(false)
+      tags:
+        - mev-boost
+        - mev
+    - name: Deploy beacon node pair
+      role: beacon_node
+      when: deploy_beacon_node | default(false)
+      tags:
+        - beacon
+        - beacon-node
+        - execution
+        - consensus
     - name: Setup and run charon-node
       role: charon_node
+      tags:
+        - charon
+        - charon-node
+    - name: Deploy validator client
+      role: validator_client
+      when: deploy_validator_client | default(false)
+      tags:
+        - validator
+        - validator-client
+    - name: Deploy Prometheus
+      role: prometheus
+      when: deploy_prometheus | default(false)
+      tags:
+        - prometheus
+        - monitoring
+    - name: Deploy Alloy
+      role: alloy
+      when: deploy_alloy | default(false)
+      tags:
+        - alloy
+        - logging
+        - monitoring

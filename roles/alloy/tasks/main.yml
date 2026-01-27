@@ -1,0 +1,70 @@
+- name: Ensure docker network exists
+  community.docker.docker_network:
+    name: "{{ docker_network_name }}"
+    state: present
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - network
+
+- name: Validate Loki endpoint
+  ansible.builtin.assert:
+    that:
+      - alloy_loki_addresses is defined
+      - alloy_loki_addresses | length > 0
+    fail_msg: "alloy_loki_addresses must be set when deploy_alloy is true"
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - validation
+
+- name: Ensure Alloy directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - "{{ alloy_config_dir }}"
+    - "{{ alloy_data_dir }}"
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - setup
+
+- name: Render Alloy config
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: "{{ alloy_config_dir }}/config.alloy"
+    mode: '0644'
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - configuration
+
+- name: Deploy Alloy
+  community.docker.docker_container:
+    name: "{{ alloy_container_name }}"
+    image: "{{ alloy_image }}:{{ alloy_version }}"
+    state: started
+    restart_policy: unless-stopped
+    user: root
+    command:
+      - run
+      - /etc/alloy/config.alloy
+    volumes:
+      - "{{ alloy_config_dir }}:/etc/alloy:ro"
+      - "{{ alloy_data_dir }}:/var/lib/alloy"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - name: "{{ docker_network_name }}"
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - deploy

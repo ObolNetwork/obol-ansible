@@ -11,7 +11,43 @@
       register: docker_valid
       ignore_errors: true
       changed_when: docker_valid != 0
+      tags:
+        - always
 
   roles:
-    - docker_install
-    - charon_cluster
+    - role: docker_install
+      tags:
+        - docker
+        - setup
+    - role: docker_network
+      tags:
+        - docker
+        - network
+        - setup
+    - role: mev_boost
+      when: deploy_mev_boost | default(false)
+      tags:
+        - mev-boost
+        - mev
+    - role: beacon_node
+      when: deploy_beacon_node | default(false)
+      tags:
+        - beacon
+        - beacon-node
+        - execution
+        - consensus
+    - role: charon_cluster
+      tags:
+        - charon
+        - charon-cluster
+    - role: prometheus
+      when: deploy_prometheus | default(false)
+      tags:
+        - prometheus
+        - monitoring
+    - role: alloy
+      when: deploy_alloy | default(false)
+      tags:
+        - alloy
+        - logging
+        - monitoring

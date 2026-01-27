@@ -1,0 +1,460 @@
+- name: Ensure docker network exists
+  community.docker.docker_network:
+    name: "{{ docker_network_name }}"
+    state: present
+  tags:
+    - beacon
+    - beacon-node
+    - network
+
+- name: Ensure beacon directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - "{{ beacon_data_dir }}"
+    - "{{ beacon_jwt_dir }}"
+    - "{{ beacon_data_dir }}/{{ execution_client }}"
+    - "{{ beacon_data_dir }}/{{ consensus_client }}"
+  tags:
+    - beacon
+    - beacon-node
+    - setup
+
+- name: Check JWT secret
+  ansible.builtin.stat:
+    path: "{{ beacon_jwt_file }}"
+  register: beacon_jwt_stat
+  tags:
+    - beacon
+    - beacon-node
+    - jwt
+
+- name: Generate JWT secret
+  ansible.builtin.shell: "openssl rand -hex 32 > {{ beacon_jwt_file }}"
+  when: not beacon_jwt_stat.stat.exists
+  changed_when: true
+  tags:
+    - beacon
+    - beacon-node
+    - jwt
+
+- name: Ensure JWT secret permissions
+  ansible.builtin.file:
+    path: "{{ beacon_jwt_file }}"
+    mode: '0600'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  tags:
+    - beacon
+    - beacon-node
+    - jwt
+
+- name: Default builder endpoint to mev-boost when enabled
+  ansible.builtin.set_fact:
+    builder_endpoint: "http://{{ mevboost_container_name | default('mev-boost') }}:18550"
+  when:
+    - deploy_mev_boost | default(false)
+    - builder_endpoint | default('') == ''
+  tags:
+    - beacon
+    - beacon-node
+    - configuration
+
+- name: Resolve execution engine port
+  ansible.builtin.set_fact:
+    execution_engine_port: >-
+      {{ geth_engine_port if execution_client == 'geth'
+        else besu_engine_port if execution_client == 'besu'
+        else reth_engine_port if execution_client == 'reth'
+        else nethermind_engine_port }}
+  tags:
+    - beacon
+    - beacon-node
+    - execution
+    - configuration
+
+- name: Deploy Nethermind execution client
+  community.docker.docker_container:
+    name: nethermind
+    image: "{{ nethermind_image }}:{{ nethermind_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "0.0.0.0:{{ nethermind_p2p_port }}:30303/tcp"
+      - "0.0.0.0:{{ nethermind_p2p_port }}:30303/udp"
+      - "127.0.0.1:{{ nethermind_http_port }}:8545"
+      - "127.0.0.1:{{ nethermind_engine_port }}:8551"
+    command: >
+      --config={{ beacon_network }}
+      --datadir=/nethermind/data
+      --HealthChecks.Enabled=true
+      --JsonRpc.Enabled=true
+      --JsonRpc.JwtSecretFile=/root/jwt/jwt.hex
+      --JsonRpc.EngineHost=0.0.0.0
+      --JsonRpc.EnginePort=8551
+      --JsonRpc.Host=0.0.0.0
+      --JsonRpc.Port=8545
+      --Metrics.Enabled=true
+      --Metrics.ExposePort=8008
+      --Sync.SnapSync=true
+      --History.Pruning=Rolling
+    volumes:
+      - "{{ beacon_data_dir }}/nethermind:/nethermind/data"
+      - "{{ beacon_jwt_dir }}:/root/jwt"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: execution_client == 'nethermind'
+  tags:
+    - beacon
+    - beacon-node
+    - execution
+    - nethermind
+    - deploy
+
+- name: Deploy Geth execution client
+  community.docker.docker_container:
+    name: geth
+    image: "{{ geth_image }}:{{ geth_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "0.0.0.0:{{ geth_p2p_port }}:30303/tcp"
+      - "0.0.0.0:{{ geth_p2p_port }}:30303/udp"
+      - "127.0.0.1:{{ geth_http_port }}:8545"
+      - "127.0.0.1:{{ geth_engine_port }}:8551"
+    command: >
+      --{{ beacon_network }}
+      --datadir=/geth
+      --port=30303
+      --http
+      --http.addr=0.0.0.0
+      --http.port=8545
+      --http.api=eth,net,web3
+      --http.vhosts=*
+      --authrpc.addr=0.0.0.0
+      --authrpc.port=8551
+      --authrpc.jwtsecret=/root/jwt/jwt.hex
+      --authrpc.vhosts=*
+    volumes:
+      - "{{ beacon_data_dir }}/geth:/geth"
+      - "{{ beacon_jwt_dir }}:/root/jwt"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: execution_client == 'geth'
+  tags:
+    - beacon
+    - beacon-node
+    - execution
+    - geth
+    - deploy
+
+- name: Deploy Besu execution client
+  community.docker.docker_container:
+    name: besu
+    image: "{{ besu_image }}:{{ besu_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "0.0.0.0:{{ besu_p2p_port }}:30303/tcp"
+      - "0.0.0.0:{{ besu_p2p_port }}:30303/udp"
+      - "127.0.0.1:{{ besu_http_port }}:8545"
+      - "127.0.0.1:{{ besu_engine_port }}:8551"
+    command: >
+      --network={{ beacon_network }}
+      --data-path=/var/lib/besu
+      --p2p-port=30303
+      --rpc-http-enabled
+      --rpc-http-host=0.0.0.0
+      --rpc-http-port=8545
+      --rpc-http-api=ETH,NET,WEB3
+      --engine-rpc-enabled
+      --engine-rpc-host=0.0.0.0
+      --engine-rpc-port=8551
+      --engine-jwt-secret=/var/lib/besu/jwt.hex
+      --host-allowlist=*
+    volumes:
+      - "{{ beacon_data_dir }}/besu:/var/lib/besu"
+      - "{{ beacon_jwt_dir }}/jwt.hex:/var/lib/besu/jwt.hex"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: execution_client == 'besu'
+  tags:
+    - beacon
+    - beacon-node
+    - execution
+    - besu
+    - deploy
+
+- name: Deploy Reth execution client
+  community.docker.docker_container:
+    name: reth
+    image: "{{ reth_image }}:{{ reth_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "0.0.0.0:{{ reth_p2p_port }}:30303/tcp"
+      - "0.0.0.0:{{ reth_p2p_port }}:30303/udp"
+      - "127.0.0.1:{{ reth_http_port }}:8545"
+      - "127.0.0.1:{{ reth_engine_port }}:8551"
+    command: >
+      node
+      --full
+      --chain={{ beacon_network }}
+      --datadir=/reth/data
+      --authrpc.jwtsecret=/root/jwt/jwt.hex
+      --authrpc.addr=0.0.0.0
+      --authrpc.port=8551
+      --http
+      --http.addr=0.0.0.0
+      --http.port=8545
+      --metrics=0.0.0.0:8008
+    volumes:
+      - "{{ beacon_data_dir }}/reth:/reth/data"
+      - "{{ beacon_jwt_dir }}:/root/jwt"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: execution_client == 'reth'
+  tags:
+    - beacon
+    - beacon-node
+    - execution
+    - reth
+    - deploy
+
+- name: Deploy Lighthouse consensus client
+  community.docker.docker_container:
+    name: lighthouse
+    image: "{{ lighthouse_image }}:{{ lighthouse_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "0.0.0.0:{{ lighthouse_p2p_port }}:9000/tcp"
+      - "0.0.0.0:{{ lighthouse_p2p_port }}:9000/udp"
+      - "127.0.0.1:{{ lighthouse_http_port }}:5052"
+      - "127.0.0.1:{{ lighthouse_metrics_port }}:5054"
+    command: >
+      lighthouse bn
+      --network={{ beacon_network }}
+      {% if checkpoint_sync_url %}--checkpoint-sync-url={{ checkpoint_sync_url }}{% endif %}
+      --checkpoint-sync-url-timeout=600
+      --execution-endpoint=http://{{ execution_client }}:{{ execution_engine_port }}
+      --execution-jwt=/opt/jwt/jwt.hex
+      --datadir=/opt/app/beacon/
+      {% if builder_endpoint %}--builder={{ builder_endpoint }}{% endif %}
+      --http
+      --http-address=0.0.0.0
+      --http-port=5052
+      --metrics
+      --metrics-address=0.0.0.0
+      --metrics-port=5054
+      --metrics-allow-origin="*"
+      {% if consensus_fee_recipient %}--suggested-fee-recipient={{ consensus_fee_recipient }}{% endif %}
+    volumes:
+      - "{{ beacon_data_dir }}/lighthouse:/opt/app/beacon"
+      - "{{ beacon_jwt_dir }}:/opt/jwt"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: consensus_client == 'lighthouse'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - lighthouse
+    - deploy
+
+- name: Deploy Teku consensus client
+  community.docker.docker_container:
+    name: teku
+    image: "{{ teku_image }}:{{ teku_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "0.0.0.0:{{ teku_p2p_port }}:9000/tcp"
+      - "0.0.0.0:{{ teku_p2p_port }}:9000/udp"
+      - "127.0.0.1:{{ teku_http_port }}:5052"
+      - "127.0.0.1:{{ teku_metrics_port }}:5054"
+    command: >
+      --network={{ beacon_network }}
+      {% if checkpoint_sync_url %}--checkpoint-sync-url={{ checkpoint_sync_url }}{% endif %}
+      --ee-endpoint=http://{{ execution_client }}:{{ execution_engine_port }}
+      --ee-jwt-secret-file=/jwt/jwt.hex
+      --data-base-path=/opt/teku/data
+      {% if builder_endpoint %}--builder-endpoint={{ builder_endpoint }}{% endif %}
+      --rest-api-enabled=true
+      --rest-api-interface=0.0.0.0
+      --rest-api-port=5052
+      --rest-api-host-allowlist="*"
+      --metrics-enabled=true
+      --metrics-interface=0.0.0.0
+      --metrics-port=5054
+      --metrics-host-allowlist="*"
+      {% if consensus_fee_recipient %}--validators-proposer-default-fee-recipient={{ consensus_fee_recipient }}{% endif %}
+      {{ teku_extra_args | default([]) | join(' ') }}
+    volumes:
+      - "{{ beacon_data_dir }}/teku:/opt/teku/data"
+      - "{{ beacon_jwt_dir }}:/jwt:ro"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: consensus_client == 'teku'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - teku
+    - deploy
+
+- name: Deploy Lodestar consensus client
+  community.docker.docker_container:
+    name: lodestar
+    image: "{{ lodestar_image }}:{{ lodestar_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "0.0.0.0:{{ lodestar_p2p_port }}:9000/tcp"
+      - "0.0.0.0:{{ lodestar_p2p_port }}:9000/udp"
+      - "127.0.0.1:{{ lodestar_http_port }}:5052"
+      - "127.0.0.1:{{ lodestar_metrics_port }}:5054"
+    command: >
+      beacon
+      --network={{ beacon_network }}
+      {% if checkpoint_sync_url %}--checkpointSyncUrl={{ checkpoint_sync_url }}{% endif %}
+      --execution.urls=http://{{ execution_client }}:{{ execution_engine_port }}
+      --jwt-secret=/jwt/jwt.hex
+      --dataDir=/opt/lodestar/data
+      {% if builder_endpoint %}--builder{% endif %}
+      {% if builder_endpoint %}--builder.url={{ builder_endpoint }}{% endif %}
+      --rest
+      --rest.address=0.0.0.0
+      --rest.port=5052
+      --metrics
+      --metrics.address=0.0.0.0
+      --metrics.port=5054
+      {% if consensus_fee_recipient %}--suggestedFeeRecipient={{ consensus_fee_recipient }}{% endif %}
+      {{ lodestar_extra_args | default([]) | join(' ') }}
+    volumes:
+      - "{{ beacon_data_dir }}/lodestar:/opt/lodestar/data"
+      - "{{ beacon_jwt_dir }}:/jwt:ro"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: consensus_client == 'lodestar'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - lodestar
+    - deploy
+
+- name: Deploy Nimbus consensus client
+  community.docker.docker_container:
+    name: nimbus
+    image: "{{ nimbus_image }}:{{ nimbus_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "0.0.0.0:{{ nimbus_p2p_port }}:9000/tcp"
+      - "0.0.0.0:{{ nimbus_p2p_port }}:9000/udp"
+      - "127.0.0.1:{{ nimbus_http_port }}:5052"
+      - "127.0.0.1:{{ nimbus_metrics_port }}:5054"
+    command: >
+      --network={{ beacon_network }}
+      --data-dir=/home/user/data
+      --web3-url=http://{{ execution_client }}:{{ execution_engine_port }}
+      --jwt-secret=/jwt/jwt.hex
+      --rest
+      --rest-address=0.0.0.0
+      --rest-port=5052
+      --metrics
+      --metrics-address=0.0.0.0
+      --metrics-port=5054
+      {% if builder_endpoint %}--payload-builder-url={{ builder_endpoint }}{% endif %}
+      {% if builder_endpoint %}--payload-builder=true{% endif %}
+      {% if consensus_fee_recipient %}--suggested-fee-recipient={{ consensus_fee_recipient }}{% endif %}
+      {{ nimbus_extra_args | default([]) | join(' ') }}
+    volumes:
+      - "{{ beacon_data_dir }}/nimbus:/home/user/data"
+      - "{{ beacon_jwt_dir }}:/jwt:ro"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: consensus_client == 'nimbus'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - nimbus
+    - deploy
+
+- name: Deploy Prysm consensus client
+  community.docker.docker_container:
+    name: prysm
+    image: "{{ prysm_image }}:{{ prysm_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "0.0.0.0:{{ prysm_p2p_port }}:13000/tcp"
+      - "0.0.0.0:{{ prysm_p2p_port }}:13000/udp"
+      - "127.0.0.1:{{ prysm_http_port }}:3500"
+    command: >
+      --accept-terms-of-use
+      --{{ beacon_network }}
+      --execution-endpoint=http://{{ execution_client }}:{{ execution_engine_port }}
+      --jwt-secret=/jwt/jwt.hex
+      --datadir=/opt/app/beacon
+      --grpc-gateway-host=0.0.0.0
+      --grpc-gateway-port=3500
+      {% if checkpoint_sync_url %}--checkpoint-sync-url={{ checkpoint_sync_url }}{% endif %}
+      {% if builder_endpoint %}--http-mev-relay={{ builder_endpoint }}{% endif %}
+      {% if consensus_fee_recipient %}--suggested-fee-recipient={{ consensus_fee_recipient }}{% endif %}
+      {{ prysm_extra_args | default([]) | join(' ') }}
+    volumes:
+      - "{{ beacon_data_dir }}/prysm:/opt/app/beacon"
+      - "{{ beacon_jwt_dir }}:/jwt:ro"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: consensus_client == 'prysm'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - prysm
+    - deploy
+
+- name: Deploy Grandine consensus client
+  community.docker.docker_container:
+    name: grandine
+    image: "{{ grandine_image }}:{{ grandine_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "0.0.0.0:{{ grandine_p2p_port }}:9000/tcp"
+      - "0.0.0.0:{{ grandine_p2p_port }}:9000/udp"
+      - "127.0.0.1:{{ grandine_http_port }}:5052"
+      - "127.0.0.1:{{ grandine_metrics_port }}:5054"
+    command: >
+      --data-dir=/root/.grandine
+      --eth1-rpc-urls=http://{{ execution_client }}:{{ execution_engine_port }}
+      --jwt-secret=/jwt/jwt.hex
+      --http-address=0.0.0.0
+      --http-port=5052
+      --network={{ beacon_network }}
+      --metrics
+      --metrics-port=5054
+      --metrics-address=0.0.0.0
+      {% if checkpoint_sync_url %}--checkpoint-sync-url={{ checkpoint_sync_url }}{% endif %}
+      {% if builder_endpoint %}--builder-url={{ builder_endpoint }}{% endif %}
+      {{ grandine_extra_args | default([]) | join(' ') }}
+    volumes:
+      - "{{ beacon_data_dir }}/grandine:/root/.grandine"
+      - "{{ beacon_jwt_dir }}:/jwt:ro"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: consensus_client == 'grandine'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - grandine
+    - deploy

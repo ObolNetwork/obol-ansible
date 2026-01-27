@@ -1,0 +1,213 @@
+- name: Ensure docker network exists
+  community.docker.docker_network:
+    name: "{{ docker_network_name }}"
+    state: present
+  tags:
+    - validator
+    - validator-client
+    - network
+
+- name: Set validator client defaults
+  ansible.builtin.set_fact:
+    validator_client_container_name: "{{ validator_client_container_name | default('vc-' ~ validator_client ~ '-' ~ node_index) }}"
+    validator_beacon_node_address: "{{ validator_beacon_node_address | default('http://charon-' ~ node_index ~ ':3600') }}"
+    validator_keys_path: "{{ validator_base_dir }}/validator_keys"
+  tags:
+    - validator
+    - validator-client
+    - configuration
+
+- name: Ensure validator client directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - "{{ validator_client_data_dir }}"
+  tags:
+    - validator
+    - validator-client
+    - setup
+
+- name: Copy Lodestar VC run script
+  ansible.builtin.copy:
+    src: lodestar-run.sh
+    dest: "{{ validator_client_data_dir }}/lodestar-run.sh"
+    mode: '0755'
+  when: validator_client == 'lodestar'
+  tags:
+    - validator
+    - validator-client
+    - lodestar
+    - configuration
+
+- name: Copy Nimbus VC run script
+  ansible.builtin.copy:
+    src: nimbus-run.sh
+    dest: "{{ validator_client_data_dir }}/nimbus-run.sh"
+    mode: '0755'
+  when: validator_client == 'nimbus'
+  tags:
+    - validator
+    - validator-client
+    - nimbus
+    - configuration
+
+- name: Copy Prysm VC run script
+  ansible.builtin.copy:
+    src: prysm-run.sh
+    dest: "{{ validator_client_data_dir }}/prysm-run.sh"
+    mode: '0755'
+  when: validator_client == 'prysm'
+  tags:
+    - validator
+    - validator-client
+    - prysm
+    - configuration
+
+- name: Copy Lighthouse VC run script
+  ansible.builtin.copy:
+    src: lighthouse-run.sh
+    dest: "{{ validator_client_data_dir }}/lighthouse-run.sh"
+    mode: '0755'
+  when: validator_client == 'lighthouse'
+  tags:
+    - validator
+    - validator-client
+    - lighthouse
+    - configuration
+
+- name: Deploy Lodestar validator client
+  community.docker.docker_container:
+    name: "{{ validator_client_container_name }}"
+    image: "{{ vc_lodestar_image }}:{{ vc_lodestar_version }}"
+    state: started
+    restart_policy: unless-stopped
+    entrypoint: /opt/lodestar/run.sh
+    env:
+      BEACON_NODE_ADDRESS: "{{ validator_beacon_node_address }}"
+      NETWORK: "{{ beacon_network }}"
+      BUILDER_API_ENABLED: "{{ validator_builder_api_enabled }}"
+      BUILDER_SELECTION: "{{ validator_builder_selection }}"
+    volumes:
+      - "{{ validator_client_data_dir }}/lodestar-run.sh:/opt/lodestar/run.sh"
+      - "{{ validator_keys_path }}:/home/charon/validator_keys"
+      - "{{ validator_client_data_dir }}:/opt/data"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: validator_client == 'lodestar'
+  tags:
+    - validator
+    - validator-client
+    - lodestar
+    - deploy
+
+- name: Deploy Nimbus validator client
+  community.docker.docker_container:
+    name: "{{ validator_client_container_name }}"
+    image: "{{ vc_nimbus_image }}:{{ vc_nimbus_version }}"
+    state: started
+    restart_policy: unless-stopped
+    entrypoint: /home/user/data/run.sh
+    env:
+      BEACON_NODE_ADDRESS: "{{ validator_beacon_node_address }}"
+      BUILDER_API_ENABLED: "{{ validator_builder_api_enabled }}"
+    volumes:
+      - "{{ validator_client_data_dir }}/nimbus-run.sh:/home/user/data/run.sh"
+      - "{{ validator_keys_path }}:/home/validator_keys"
+      - "{{ validator_client_data_dir }}:/home/user/data"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: validator_client == 'nimbus'
+  tags:
+    - validator
+    - validator-client
+    - nimbus
+    - deploy
+
+- name: Deploy Prysm validator client
+  community.docker.docker_container:
+    name: "{{ validator_client_container_name }}"
+    image: "{{ vc_prysm_image }}:{{ vc_prysm_version }}"
+    state: started
+    restart_policy: unless-stopped
+    entrypoint: /home/prysm/run.sh
+    env:
+      BEACON_NODE_ADDRESS: "{{ validator_beacon_node_address }}"
+      NETWORK: "{{ beacon_network }}"
+    volumes:
+      - "{{ validator_client_data_dir }}/prysm-run.sh:/home/prysm/run.sh"
+      - "{{ validator_keys_path }}:/home/charon/validator_keys"
+      - "{{ validator_client_data_dir }}:/data/vc"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: validator_client == 'prysm'
+  tags:
+    - validator
+    - validator-client
+    - prysm
+    - deploy
+
+- name: Deploy Teku validator client
+  community.docker.docker_container:
+    name: "{{ validator_client_container_name }}"
+    image: "{{ vc_teku_image }}:{{ vc_teku_version }}"
+    state: started
+    restart_policy: unless-stopped
+    command:
+      - validator-client
+      - --beacon-node-api-endpoint
+      - "{{ validator_beacon_node_address }}"
+      - --network
+      - "{{ beacon_network }}"
+      - --data-base-path=/home/data
+      - --validator-keys=/opt/charon/validator_keys:/opt/charon/validator_keys
+      - --validators-keystore-locking-enabled
+      - "false"
+      - --validators-external-signer-slashing-protection-enabled
+      - "true"
+      - --validators-builder-registration-default-enabled
+      - "{{ validator_builder_api_enabled }}"
+      - --validators-proposer-default-fee-recipient
+      - "{{ validator_fee_recipient }}"
+      - --Xobol-dvt-integration-enabled
+      - "true"
+    volumes:
+      - "{{ validator_keys_path }}:/opt/charon/validator_keys"
+      - "{{ validator_client_data_dir }}:/home/data"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: validator_client == 'teku'
+  tags:
+    - validator
+    - validator-client
+    - teku
+    - deploy
+
+- name: Deploy Lighthouse validator client
+  community.docker.docker_container:
+    name: "{{ validator_client_container_name }}"
+    image: "{{ vc_lighthouse_image }}:{{ vc_lighthouse_version }}"
+    state: started
+    restart_policy: unless-stopped
+    entrypoint: /opt/lighthouse/run.sh
+    env:
+      BEACON_NODE_ADDRESS: "{{ validator_beacon_node_address }}"
+      NETWORK: "{{ beacon_network }}"
+      BUILDER_API_ENABLED: "{{ validator_builder_api_enabled }}"
+      FEE_RECIPIENT: "{{ validator_fee_recipient }}"
+      LIGHTHOUSE_METRICS_PORT: "{{ vc_lighthouse_metrics_port }}"
+    volumes:
+      - "{{ validator_client_data_dir }}/lighthouse-run.sh:/opt/lighthouse/run.sh"
+      - "{{ validator_keys_path }}:/opt/charon/validator_keys"
+      - "{{ validator_client_data_dir }}:/opt/lighthouse"
+    networks:
+      - name: "{{ docker_network_name }}"
+  when: validator_client == 'lighthouse'
+  tags:
+    - validator
+    - validator-client
+    - lighthouse
+    - deploy
