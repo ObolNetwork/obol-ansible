@@ -1,0 +1,177 @@
+discovery.docker "docker" {
+	host = "{{ alloy_docker_host }}"
+}
+
+loki.process "docker" {
+	forward_to = [loki.write.default.receiver]
+
+	stage.docker { }
+}
+
+discovery.relabel "docker" {
+	targets = discovery.docker.docker.targets
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/(.*)"
+		target_label  = "container"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "charon-.*"
+		target_label  = "job"
+		replacement   = "charon"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "nethermind"
+		target_label  = "job"
+		replacement   = "nethermind"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "geth"
+		target_label  = "job"
+		replacement   = "geth"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "besu"
+		target_label  = "job"
+		replacement   = "besu"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "reth"
+		target_label  = "job"
+		replacement   = "reth"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "lighthouse"
+		target_label  = "job"
+		replacement   = "lighthouse"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "teku"
+		target_label  = "job"
+		replacement   = "teku"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "lodestar"
+		target_label  = "job"
+		replacement   = "lodestar"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "nimbus"
+		target_label  = "job"
+		replacement   = "nimbus"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "prysm"
+		target_label  = "job"
+		replacement   = "prysm"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "grandine"
+		target_label  = "job"
+		replacement   = "grandine"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "vc-lodestar-.*"
+		target_label  = "job"
+		replacement   = "vc-lodestar"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "vc-nimbus-.*"
+		target_label  = "job"
+		replacement   = "vc-nimbus"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "vc-prysm-.*"
+		target_label  = "job"
+		replacement   = "vc-prysm"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "vc-teku-.*"
+		target_label  = "job"
+		replacement   = "vc-teku"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "vc-lighthouse-.*"
+		target_label  = "job"
+		replacement   = "vc-lighthouse"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "{{ mevboost_container_name | default('mev-boost') }}"
+		target_label  = "job"
+		replacement   = "mev-boost"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "{{ prometheus_container_name | default('prometheus') }}"
+		target_label  = "job"
+		replacement   = "prometheus"
+	}
+
+	rule {
+		source_labels = ["container"]
+		regex         = "{{ alloy_container_name | default('alloy') }}"
+		target_label  = "job"
+		replacement   = "alloy"
+	}
+
+	{% if alloy_drop_unknown | default(true) %}
+	rule {
+		source_labels = ["job"]
+		regex         = "^$"
+		action        = "drop"
+	}
+	{% endif %}
+}
+
+loki.source.docker "docker" {
+	host          = "{{ alloy_docker_host }}"
+	targets       = discovery.docker.docker.targets
+	forward_to    = [loki.process.docker.receiver]
+	relabel_rules = discovery.relabel.docker.rules
+}
+
+loki.write "default" {
+	endpoint {
+		url = "{{ alloy_loki_addresses }}"
+	}
+	external_labels = {
+		nickname = "{{ alloy_nickname }}",
+		host     = "{{ inventory_hostname }}",
+	}
+}
