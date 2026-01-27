@@ -95,3 +95,155 @@ synthetic_block_proposals: ''
 
 # -- Listening address (ip and port) for validator-facing traffic proxying the beacon-node API. (default "127.0.0.1:3600")
 validator_api_address: '0.0.0.0:3600'
+
+# Docker network shared by beacon node, charon, and validator client
+docker_network_name: 'dvnode'
+
+# Beacon node deployment
+deploy_beacon_node: false
+beacon_network: 'mainnet'
+execution_client: 'nethermind'
+consensus_client: 'lighthouse'
+checkpoint_sync_url: ''
+builder_endpoint: ''
+consensus_fee_recipient: ''
+
+# Beacon node storage
+beacon_base_dir: "/home/{{ ansible_user }}/beacon"
+beacon_data_dir: "{{ beacon_base_dir }}/data"
+beacon_jwt_dir: "{{ beacon_base_dir }}/jwt"
+beacon_jwt_file: "{{ beacon_jwt_dir }}/jwt.hex"
+
+# Execution clients
+nethermind_image: 'nethermind/nethermind'
+nethermind_version: '1.36.0'
+nethermind_p2p_port: 30303
+nethermind_http_port: 8545
+nethermind_engine_port: 8551
+
+geth_image: 'ethereum/client-go'
+geth_version: 'v1.16.8'
+geth_p2p_port: 30303
+geth_http_port: 8545
+geth_engine_port: 8551
+
+besu_image: 'hyperledger/besu'
+besu_version: '25.12.0'
+besu_p2p_port: 30303
+besu_http_port: 8545
+besu_engine_port: 8551
+
+reth_image: 'ghcr.io/paradigmxyz/reth'
+reth_version: 'v1.10.1'
+reth_p2p_port: 30303
+reth_http_port: 8545
+reth_engine_port: 8551
+
+# Consensus clients
+lighthouse_image: 'sigp/lighthouse'
+lighthouse_version: 'v8.0.1'
+lighthouse_p2p_port: 9000
+lighthouse_http_port: 5052
+lighthouse_metrics_port: 5054
+
+nimbus_image: 'statusim/nimbus-eth2'
+nimbus_version: 'multiarch-v25.11.0'
+nimbus_p2p_port: 9000
+nimbus_http_port: 5052
+nimbus_metrics_port: 5054
+nimbus_extra_args: []
+
+teku_image: 'consensys/teku'
+teku_version: '25.12.0'
+teku_p2p_port: 9000
+teku_http_port: 5052
+teku_metrics_port: 5054
+teku_extra_args: []
+
+lodestar_image: 'chainsafe/lodestar'
+lodestar_version: 'v1.38.0'
+lodestar_p2p_port: 9000
+lodestar_http_port: 5052
+lodestar_metrics_port: 5054
+lodestar_extra_args: []
+
+prysm_image: 'gcr.io/prysmaticlabs/prysm/beacon-chain'
+prysm_version: 'v7.1.2'
+prysm_p2p_port: 13000
+prysm_http_port: 3500
+prysm_extra_args: []
+
+grandine_image: 'sifrai/grandine'
+grandine_version: '2.0.1'
+grandine_p2p_port: 9000
+grandine_http_port: 5052
+grandine_metrics_port: 5054
+grandine_extra_args: []
+
+# Validator client deployment
+deploy_validator_client: false
+validator_client: 'nimbus'
+validator_beacon_node_address: "http://charon-{{ node_index }}:3600"
+validator_builder_api_enabled: 'true'
+validator_builder_selection: 'builderalways'
+validator_fee_recipient: '0x0000000000000000000000000000000000000000'
+
+vc_lodestar_image: 'chainsafe/lodestar'
+vc_lodestar_version: 'v1.38.0'
+vc_lighthouse_image: 'sigp/lighthouse'
+vc_lighthouse_version: 'v8.0.1'
+vc_lighthouse_metrics_port: 5064
+vc_nimbus_image: 'statusim/nimbus-validator-client'
+vc_nimbus_version: 'multiarch-v25.11.1'
+vc_prysm_image: 'offchainlabs/prysm-validator'
+vc_prysm_version: 'v7.1.0'
+vc_teku_image: 'consensys/teku'
+vc_teku_version: '25.12.0'
+
+validator_base_dir: "/home/{{ ansible_user }}/node-{{ node_index }}"
+validator_client_data_dir: "{{ validator_base_dir }}/vc-{{ validator_client }}"
+
+# MEV-Boost deployment
+deploy_mev_boost: false
+mevboost_container_name: 'mev-boost'
+mevboost_image: 'flashbots/mev-boost'
+mevboost_version: '1.10.1'
+mevboost_port: 18550
+mevboost_metrics_port: 18551
+mevboost_bind_address: '127.0.0.1'
+mevboost_expose_port: false
+mevboost_log_level: 'info'
+mevboost_relays: []
+
+# Prometheus deployment
+deploy_prometheus: false
+prometheus_container_name: 'prometheus'
+prometheus_image: 'prom/prometheus'
+prometheus_version: 'v3.7.3'
+prometheus_user: 'root'
+prometheus_config_dir: "/home/{{ ansible_user }}/prometheus"
+prometheus_data_dir: "{{ prometheus_config_dir }}/data"
+prometheus_port: 9090
+prometheus_bind_address: '127.0.0.1'
+prometheus_expose_port: false
+prometheus_scrape_interval: '30s'
+prometheus_evaluation_interval: '30s'
+prom_service_owner: "{{ inventory_hostname }}"
+prom_remote_write_enabled: false
+prom_remote_write_url: 'https://vm.monitoring.gcp.obol.tech/write'
+prom_remote_write_token: ''
+prom_remote_write_keep_job_regex: 'charon'
+prometheus_charon_targets:
+  - "charon-{{ node_index }}:3620"
+
+# Alloy deployment
+deploy_alloy: false
+alloy_container_name: 'alloy'
+alloy_image: 'grafana/alloy'
+alloy_version: 'v1.12.2'
+alloy_config_dir: '/etc/alloy'
+alloy_data_dir: '/var/lib/alloy'
+alloy_docker_host: 'unix:///var/run/docker.sock'
+alloy_loki_addresses: ''
+alloy_nickname: "{{ inventory_hostname }}"
+alloy_drop_unknown: true
