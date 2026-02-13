@@ -1,0 +1,24 @@
+---
+# Container image tag for Lodestar validator client
+validator_lodestar_image_version: "v1.34.1"
+
+# Target Ethereum network, e.g. "hoodi", "mainnet"
+validator_lodestar_network: "hoodi"
+
+# Whether to enable the builder API
+validator_lodestar_builder_api_enabled: false
+
+# Lodestar builder selection strategy
+validator_lodestar_builder_selection: "builderalways"
+
+# Base directory for Lodestar artifacts on the target host
+validator_lodestar_base_dir: "~/node-{{ validator_node_index }}/lodestar"
+
+# Data directory lives under the base path by default
+validator_lodestar_data_dir: "{{ validator_lodestar_base_dir }}/data"
+
+# Lodestar container name
+validator_lodestar_container_name: "lodestar-{{ validator_node_index }}"
+
+# Endpoint Lodestar uses to reach Charon's validator API
+validator_lodestar_beacon_node_address: "http://charon-{{ validator_node_index }}:{{ validator_api_port }}"

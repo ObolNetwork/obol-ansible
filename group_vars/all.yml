@@ -95,3 +95,6 @@ synthetic_block_proposals: ''
 
 # -- Listening address (ip and port) for validator-facing traffic proxying the beacon-node API. (default "127.0.0.1:3600")
 validator_api_address: '0.0.0.0:3600'
+
+# -- Validator client to run alongside charon. Supported values: "lodestar". Leave empty to skip.
+charon_node_validator_client: ''
