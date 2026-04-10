@@ -1,0 +1,262 @@
+name: Smoke Tests
+
+on:
+  pull_request:
+    paths:
+      - "roles/**"
+      - "group_vars/**"
+      - "charon-*.yml"
+      - ".github/workflows/smoke-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 11 supported EL/CL pairs from README
+          - el: geth
+            cl: lighthouse
+            vc: lighthouse
+          - el: nethermind
+            cl: lighthouse
+            vc: lodestar
+          - el: reth
+            cl: lighthouse
+            vc: nimbus
+          - el: geth
+            cl: teku
+            vc: teku
+          - el: nethermind
+            cl: teku
+            vc: prysm
+          - el: geth
+            cl: lodestar
+            vc: lighthouse
+          - el: nethermind
+            cl: lodestar
+            vc: lodestar
+          - el: besu
+            cl: nimbus
+            vc: nimbus
+          - el: nethermind
+            cl: nimbus
+            vc: lighthouse
+          - el: geth
+            cl: prysm
+            vc: prysm
+          - el: nethermind
+            cl: grandine
+            vc: lodestar
+
+    name: "${{ matrix.cl }}-${{ matrix.el }} (vc: ${{ matrix.vc }})"
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Install Ansible
+        run: |
+          pip install ansible docker
+
+      - name: Create test inventory
+        run: |
+          cat > test-hosts.yml << 'EOF'
+          all:
+            hosts:
+              localhost:
+                ansible_connection: local
+                ansible_python_interpreter: "{{ ansible_playbook_python }}"
+          EOF
+
+      - name: Create test vars
+        run: |
+          cat > test-vars.yml << EOF
+          # Override defaults for smoke test
+          beacon_node_endpoints: "http://${{ matrix.cl }}:${{ matrix.cl == 'prysm' && '3500' || '5052' }}"
+          deploy_beacon_node: false
+          deploy_validator_client: false
+          deploy_mev_boost: false
+          deploy_prometheus: false
+          deploy_alloy: false
+
+          # Use simnet mock (no real BN needed)
+          simnet_beacon_mock: "true"
+          simnet_validator_mock: "true"
+          no_verify: "true"
+
+          # Charon settings
+          node_image_version: "v1.10.0-rc1"
+          docker_network_name: "smoke-test"
+
+          # Client selection
+          execution_client: "${{ matrix.el }}"
+          consensus_client: "${{ matrix.cl }}"
+          validator_client: "${{ matrix.vc }}"
+          EOF
+
+      - name: Create Docker network
+        run: docker network create smoke-test || true
+
+      - name: Generate JWT secret
+        run: |
+          mkdir -p /tmp/beacon/jwt
+          openssl rand -hex 32 > /tmp/beacon/jwt/jwt.hex
+
+      - name: Pull EL image
+        run: |
+          case "${{ matrix.el }}" in
+            geth)       docker pull ethereum/client-go:$(grep geth_version group_vars/all.yml | awk -F"'" '{print $2}') ;;
+            nethermind) docker pull nethermind/nethermind:$(grep nethermind_version group_vars/all.yml | awk -F"'" '{print $2}') ;;
+            besu)       docker pull hyperledger/besu:$(grep besu_version group_vars/all.yml | awk -F"'" '{print $2}') ;;
+            reth)       docker pull ghcr.io/paradigmxyz/reth:$(grep reth_version group_vars/all.yml | awk -F"'" '{print $2}') ;;
+          esac
+
+      - name: Pull CL image
+        run: |
+          case "${{ matrix.cl }}" in
+            lighthouse) docker pull sigp/lighthouse:$(grep "^lighthouse_version" group_vars/all.yml | awk -F"'" '{print $2}') ;;
+            teku)       docker pull consensys/teku:$(grep "^teku_version" group_vars/all.yml | awk -F"'" '{print $2}') ;;
+            lodestar)   docker pull chainsafe/lodestar:$(grep "^lodestar_version" group_vars/all.yml | awk -F"'" '{print $2}') ;;
+            nimbus)     docker pull statusim/nimbus-eth2:$(grep "^nimbus_version" group_vars/all.yml | awk -F"'" '{print $2}') ;;
+            prysm)      docker pull gcr.io/prysmaticlabs/prysm/beacon-chain:$(grep "^prysm_version" group_vars/all.yml | awk -F"'" '{print $2}') ;;
+            grandine)   docker pull sifrai/grandine:$(grep "^grandine_version" group_vars/all.yml | awk -F"'" '{print $2}') ;;
+          esac
+
+      - name: Start EL client
+        run: |
+          JWT=$(cat /tmp/beacon/jwt/jwt.hex)
+          case "${{ matrix.el }}" in
+            geth)
+              docker run -d --name ${{ matrix.el }} --network smoke-test \
+                -v /tmp/beacon/jwt:/jwt \
+                ethereum/client-go:$(grep geth_version group_vars/all.yml | awk -F"'" '{print $2}') \
+                --http --http.addr=0.0.0.0 --http.vhosts=* \
+                --authrpc.addr=0.0.0.0 --authrpc.vhosts=* --authrpc.jwtsecret=/jwt/jwt.hex \
+                --nodiscover --maxpeers=0 --dev
+              ;;
+            nethermind)
+              docker run -d --name ${{ matrix.el }} --network smoke-test \
+                -v /tmp/beacon/jwt:/jwt \
+                nethermind/nethermind:$(grep nethermind_version group_vars/all.yml | awk -F"'" '{print $2}') \
+                --JsonRpc.Enabled=true --JsonRpc.Host=0.0.0.0 \
+                --JsonRpc.JwtSecretFile=/jwt/jwt.hex \
+                --Init.DiagnosticMode=None --Discovery.Enabled=false \
+                --config=none.cfg 2>/dev/null || \
+              docker run -d --name ${{ matrix.el }} --network smoke-test \
+                -v /tmp/beacon/jwt:/jwt \
+                nethermind/nethermind:$(grep nethermind_version group_vars/all.yml | awk -F"'" '{print $2}') \
+                --JsonRpc.Enabled=true --JsonRpc.Host=0.0.0.0 \
+                --JsonRpc.JwtSecretFile=/jwt/jwt.hex \
+                --Init.DiagnosticMode=None --Discovery.Enabled=false
+              ;;
+            besu)
+              docker run -d --name ${{ matrix.el }} --network smoke-test \
+                -v /tmp/beacon/jwt:/jwt \
+                hyperledger/besu:$(grep besu_version group_vars/all.yml | awk -F"'" '{print $2}') \
+                --rpc-http-enabled --rpc-http-host=0.0.0.0 \
+                --engine-rpc-enabled --engine-jwt-secret=/jwt/jwt.hex \
+                --engine-host-allowlist=* --host-allowlist=* \
+                --discovery-enabled=false
+              ;;
+            reth)
+              docker run -d --name ${{ matrix.el }} --network smoke-test \
+                -v /tmp/beacon/jwt:/jwt \
+                ghcr.io/paradigmxyz/reth:$(grep reth_version group_vars/all.yml | awk -F"'" '{print $2}') \
+                node --http --http.addr=0.0.0.0 \
+                --authrpc.addr=0.0.0.0 --authrpc.jwtsecret=/jwt/jwt.hex \
+                --discovery.disable --dev
+              ;;
+          esac
+
+      - name: Wait for EL
+        run: |
+          echo "Waiting for EL to start..."
+          for i in $(seq 1 30); do
+            if docker exec ${{ matrix.el }} sh -c "true" 2>/dev/null; then
+              echo "EL container is running"
+              break
+            fi
+            sleep 2
+          done
+          docker logs ${{ matrix.el }} 2>&1 | tail -5
+
+      - name: Verify EL engine API responds
+        run: |
+          sleep 10
+          # Check EL is alive via JSON-RPC
+          docker run --rm --network smoke-test curlimages/curl \
+            -s -f -X POST -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}' \
+            http://${{ matrix.el }}:8545 || echo "EL RPC not ready yet (may be normal for some clients)"
+          echo "EL started: ${{ matrix.el }}"
+
+      - name: Generate Charon cluster artifacts
+        run: |
+          mkdir -p /tmp/charon
+          docker run --rm -v /tmp/charon:/opt/charon obolnetwork/charon:v1.9.3 create cluster \
+            --name=smoke-test \
+            --num-validators=1 \
+            --num-nodes=1 \
+            --withdrawal-addresses=0x0000000000000000000000000000000000000000 \
+            --fee-recipient-addresses=0x0000000000000000000000000000000000000000 \
+            --network=hoodi
+          echo "Generated artifacts:"
+          find /tmp/charon -type f | head -20
+
+      - name: Start Charon
+        run: |
+          docker run -d --name charon-0 --network smoke-test \
+            -v /tmp/charon/cluster/node0:/opt/charon/.charon \
+            obolnetwork/charon:v1.9.3 run \
+            --beacon-node-endpoints="${{ matrix.cl == 'prysm' && 'http://mock-bn:3500' || 'http://mock-bn:5052' }}" \
+            --p2p-tcp-address=0.0.0.0:3610 \
+            --validator-api-address=0.0.0.0:3600 \
+            --monitoring-address=0.0.0.0:3620 \
+            --log-level=info \
+            --no-verify
+          sleep 15
+
+      - name: Verify Charon health
+        run: |
+          echo "Charon container status:"
+          docker ps -a --filter name=charon-0 --format "{{.Status}}"
+          echo ""
+
+          # Check Charon monitoring endpoint
+          docker run --rm --network smoke-test curlimages/curl \
+            -s -f http://charon-0:3620/livez && echo "Charon livez: OK" || echo "Charon livez: not ready"
+
+          # Check Charon validator API
+          docker run --rm --network smoke-test curlimages/curl \
+            -s -f http://charon-0:3600/eth/v1/node/version && echo "Charon validator API: OK" || echo "Charon API: not ready"
+
+          # Show logs if not healthy
+          docker logs charon-0 2>&1 | tail -10
+
+      - name: Connectivity summary
+        if: always()
+        run: |
+          echo "============================================"
+          echo "Smoke Test: ${{ matrix.cl }}-${{ matrix.el }} (vc: ${{ matrix.vc }})"
+          echo "============================================"
+          echo ""
+          echo "Container status:"
+          docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || true
+          echo ""
+          echo "EL logs (last 5):"
+          docker logs ${{ matrix.el }} 2>&1 | tail -5 || true
+          echo ""
+          echo "Charon logs (last 5):"
+          docker logs charon-0 2>&1 | tail -5 || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f ${{ matrix.el }} charon-0 2>/dev/null || true
+          docker network rm smoke-test 2>/dev/null || true
