@@ -1,0 +1,24 @@
+[Unit]
+Description=MEV-Boost
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/mev-boost \
+  -{{ beacon_network }} \
+  -loglevel={{ mevboost_log_level }} \
+  -addr=127.0.0.1:{{ mevboost_port }} \
+{% if mevboost_metrics_port | default('') %}
+  -metrics \
+  -metrics-addr=0.0.0.0:{{ mevboost_metrics_port }} \
+{% endif %}
+  -relay-check \
+  -relays={{ mevboost_relays_value }}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

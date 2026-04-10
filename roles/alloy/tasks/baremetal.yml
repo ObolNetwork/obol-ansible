@@ -1,0 +1,126 @@
+---
+# =============================================================================
+# Alloy bare-metal deployment (journald-based log collection)
+# =============================================================================
+
+- name: Validate Loki endpoint
+  ansible.builtin.assert:
+    that:
+      - alloy_loki_addresses is defined
+      - alloy_loki_addresses | length > 0
+    fail_msg: "alloy_loki_addresses must be set when deploy_alloy is true"
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - validation
+
+- name: Ensure Alloy directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ baremetal_user }}"
+    group: "{{ baremetal_group }}"
+  loop:
+    - "{{ alloy_config_dir }}"
+    - "{{ alloy_data_dir }}"
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - setup
+
+# =============================================================================
+# Download Alloy binary
+# =============================================================================
+
+- name: Download Alloy
+  ansible.builtin.get_url:
+    url: "https://github.com/grafana/alloy/releases/download/{{ alloy_version }}/alloy-linux-amd64.zip"
+    dest: /tmp/alloy.zip
+    mode: '0644'
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - deploy
+
+- name: Create Alloy extract directory
+  ansible.builtin.file:
+    path: /tmp/alloy-extract
+    state: directory
+    mode: '0755'
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - deploy
+
+- name: Extract Alloy
+  ansible.builtin.unarchive:
+    src: /tmp/alloy.zip
+    dest: /tmp/alloy-extract
+    remote_src: true
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - deploy
+
+- name: Install Alloy binary
+  ansible.builtin.copy:
+    src: /tmp/alloy-extract/alloy-linux-amd64
+    dest: "{{ baremetal_bin_dir }}/alloy"
+    mode: '0755'
+    owner: root
+    group: root
+    remote_src: true
+  notify: restart alloy
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - deploy
+
+# =============================================================================
+# Deploy config and systemd service
+# =============================================================================
+
+- name: Render Alloy config (baremetal / journald)
+  ansible.builtin.template:
+    src: config-baremetal.alloy.j2
+    dest: "{{ alloy_config_dir }}/config.alloy"
+    mode: '0644'
+    owner: "{{ baremetal_user }}"
+    group: "{{ baremetal_group }}"
+  notify: restart alloy
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - configuration
+
+- name: Deploy Alloy systemd service
+  ansible.builtin.template:
+    src: alloy.service.j2
+    dest: /etc/systemd/system/alloy.service
+    mode: '0644'
+  notify: restart alloy
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - deploy
+
+- name: Enable and start Alloy
+  ansible.builtin.systemd:
+    name: alloy
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags:
+    - alloy
+    - logging
+    - monitoring
+    - deploy

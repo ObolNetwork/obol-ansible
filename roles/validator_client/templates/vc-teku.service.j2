@@ -1,0 +1,29 @@
+[Unit]
+Description=Teku Validator Client (node {{ node_index }})
+After=network-online.target
+Wants=network-online.target
+After=charon-{{ node_index }}.service
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/teku validator-client \
+  --network={{ beacon_network }} \
+  --data-base-path={{ validator_client_data_dir }} \
+  --beacon-node-api-endpoint={{ validator_beacon_node_address }} \
+  --validator-keys={{ validator_keys_path }}:{{ validator_keys_path }} \
+  --validators-keystore-locking-enabled=false \
+  --validators-external-signer-slashing-protection-enabled=true \
+  --validators-builder-registration-default-enabled={{ validator_builder_api_enabled | default('true') }} \
+  --validators-proposer-default-fee-recipient={{ validator_fee_recipient }} \
+  --Xobol-dvt-integration-enabled=true \
+  --metrics-enabled=true \
+  --metrics-interface=0.0.0.0 \
+  --metrics-port=5064
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

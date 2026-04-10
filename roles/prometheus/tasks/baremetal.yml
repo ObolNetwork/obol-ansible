@@ -1,0 +1,121 @@
+---
+# =============================================================================
+# Prometheus bare-metal deployment
+# =============================================================================
+
+- name: Validate remote write settings
+  ansible.builtin.assert:
+    that:
+      - prom_remote_write_url | length > 0
+      - prom_remote_write_token | length > 0
+    fail_msg: "prom_remote_write_url and prom_remote_write_token must be set when prom_remote_write_enabled is true"
+  when: prom_remote_write_enabled | default(false)
+  tags:
+    - prometheus
+    - monitoring
+    - validation
+
+- name: Ensure Prometheus directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ baremetal_user }}"
+    group: "{{ baremetal_group }}"
+  loop:
+    - "{{ prometheus_config_dir }}"
+    - "{{ prometheus_data_dir }}"
+  tags:
+    - prometheus
+    - monitoring
+    - setup
+
+# =============================================================================
+# Download Prometheus binary
+# =============================================================================
+
+- name: Download Prometheus
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/prometheus/releases/download/{{ prometheus_version }}/prometheus-{{ prometheus_version | regex_replace('^v', '') }}.linux-amd64.tar.gz"
+    dest: /tmp/prometheus.tar.gz
+    mode: '0644'
+  tags:
+    - prometheus
+    - monitoring
+    - deploy
+
+- name: Create Prometheus extract directory
+  ansible.builtin.file:
+    path: /tmp/prometheus-extract
+    state: directory
+    mode: '0755'
+  tags:
+    - prometheus
+    - monitoring
+    - deploy
+
+- name: Extract Prometheus
+  ansible.builtin.unarchive:
+    src: /tmp/prometheus.tar.gz
+    dest: /tmp/prometheus-extract
+    remote_src: true
+  tags:
+    - prometheus
+    - monitoring
+    - deploy
+
+- name: Install Prometheus binaries
+  ansible.builtin.copy:
+    src: "/tmp/prometheus-extract/prometheus-{{ prometheus_version | regex_replace('^v', '') }}.linux-amd64/{{ item }}"
+    dest: "{{ baremetal_bin_dir }}/{{ item }}"
+    mode: '0755'
+    owner: root
+    group: root
+    remote_src: true
+  loop:
+    - prometheus
+    - promtool
+  notify: restart prometheus
+  tags:
+    - prometheus
+    - monitoring
+    - deploy
+
+# =============================================================================
+# Deploy config and systemd service
+# =============================================================================
+
+- name: Render Prometheus config
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ prometheus_config_dir }}/prometheus.yml"
+    mode: '0644'
+    owner: "{{ baremetal_user }}"
+    group: "{{ baremetal_group }}"
+  notify: restart prometheus
+  tags:
+    - prometheus
+    - monitoring
+    - configuration
+
+- name: Deploy Prometheus systemd service
+  ansible.builtin.template:
+    src: prometheus.service.j2
+    dest: /etc/systemd/system/prometheus.service
+    mode: '0644'
+  notify: restart prometheus
+  tags:
+    - prometheus
+    - monitoring
+    - deploy
+
+- name: Enable and start Prometheus
+  ansible.builtin.systemd:
+    name: prometheus
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags:
+    - prometheus
+    - monitoring
+    - deploy

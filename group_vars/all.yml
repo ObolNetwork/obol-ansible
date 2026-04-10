@@ -2,6 +2,17 @@
 # -- The version of charon to run. (default "v1.3.0")
 node_image_version: 'v1.9.3'
 
+# Deployment mode: "docker" (default) or "baremetal"
+# Docker: current behavior using Docker containers
+# Baremetal: native binaries with systemd services
+deployment_mode: 'docker'
+
+# Baremetal settings (only used when deployment_mode == 'baremetal')
+baremetal_bin_dir: '/usr/local/bin'
+baremetal_data_dir: '/var/lib/obol'
+baremetal_user: 'obol'
+baremetal_group: 'obol'
+
 # -- The index of the node that is being run. (default "0")
 node_index: '0'
 

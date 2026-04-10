@@ -1,0 +1,33 @@
+[Unit]
+Description=Nimbus Beacon Node
+After=network-online.target
+Wants=network-online.target
+After={{ execution_client }}.service
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/nimbus_beacon_node \
+  --network={{ beacon_network }} \
+  --data-dir={{ baremetal_data_dir }}/nimbus \
+  --tcp-port={{ nimbus_p2p_port }} \
+  --udp-port={{ nimbus_p2p_port }} \
+  --web3-url=http://127.0.0.1:{{ execution_engine_port }} \
+  --jwt-secret={{ beacon_jwt_file }} \
+  --rest \
+  --rest-address=0.0.0.0 \
+  --rest-port={{ nimbus_http_port }} \
+  --metrics \
+  --metrics-address=0.0.0.0 \
+  --metrics-port={{ nimbus_metrics_port }}{% if builder_endpoint %} \
+  --payload-builder-url={{ builder_endpoint }} \
+  --payload-builder=true{% endif %}{% if consensus_fee_recipient %} \
+  --suggested-fee-recipient={{ consensus_fee_recipient }}{% endif %}{% if nimbus_extra_args | default([]) | length > 0 %} \
+  {{ nimbus_extra_args | join(' ') }}{% endif %}
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

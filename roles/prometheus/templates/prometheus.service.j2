@@ -1,0 +1,19 @@
+[Unit]
+Description=Prometheus Monitoring
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/prometheus \
+  --config.file={{ prometheus_config_dir }}/prometheus.yml \
+  --storage.tsdb.path={{ prometheus_data_dir }} \
+  --web.listen-address=0.0.0.0:{{ prometheus_port }}
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

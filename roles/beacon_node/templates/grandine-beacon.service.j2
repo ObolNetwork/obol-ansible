@@ -1,0 +1,29 @@
+[Unit]
+Description=Grandine Beacon Node
+After=network-online.target
+Wants=network-online.target
+After={{ execution_client }}.service
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/grandine \
+  --network={{ beacon_network }} \
+  --data-dir={{ baremetal_data_dir }}/grandine \
+  --eth1-rpc-urls=http://127.0.0.1:{{ execution_engine_port }} \
+  --jwt-secret={{ beacon_jwt_file }} \
+  --http-address=0.0.0.0 \
+  --http-port={{ grandine_http_port }} \
+  --metrics \
+  --metrics-address=0.0.0.0 \
+  --metrics-port={{ grandine_metrics_port }}{% if checkpoint_sync_url %} \
+  --checkpoint-sync-url={{ checkpoint_sync_url }}{% endif %}{% if builder_endpoint %} \
+  --builder-url={{ builder_endpoint }}{% endif %}{% if grandine_extra_args | default([]) | length > 0 %} \
+  {{ grandine_extra_args | join(' ') }}{% endif %}
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

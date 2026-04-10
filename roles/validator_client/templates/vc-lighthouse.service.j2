@@ -1,0 +1,29 @@
+[Unit]
+Description=Lighthouse Validator Client (node {{ node_index }})
+After=network-online.target
+Wants=network-online.target
+After=charon-{{ node_index }}.service
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/lighthouse validator_client \
+  --beacon-nodes={{ validator_beacon_node_address }} \
+  --network={{ beacon_network }} \
+  --datadir={{ validator_client_data_dir }} \
+  --init-slashing-protection \
+  --use-long-timeouts \
+  --distributed \
+  --metrics \
+  --metrics-address=0.0.0.0 \
+  --metrics-port={{ vc_lighthouse_metrics_port }} \
+  --suggested-fee-recipient={{ validator_fee_recipient }}{% if validator_builder_api_enabled | default('false') | string == 'true' %} \
+  --builder-proposals{% endif %}
+
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

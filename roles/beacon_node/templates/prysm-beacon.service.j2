@@ -1,0 +1,32 @@
+[Unit]
+Description=Prysm Beacon Node
+After=network-online.target
+Wants=network-online.target
+After={{ execution_client }}.service
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/prysm-beacon-chain \
+  --accept-terms-of-use \
+  --{{ beacon_network }} \
+  --datadir={{ baremetal_data_dir }}/prysm \
+  --p2p-tcp-port={{ prysm_p2p_port }} \
+  --p2p-udp-port={{ prysm_p2p_port }} \
+  --execution-endpoint=http://127.0.0.1:{{ execution_engine_port }} \
+  --jwt-secret={{ beacon_jwt_file }} \
+  --grpc-gateway-host=0.0.0.0 \
+  --grpc-gateway-port={{ prysm_http_port }} \
+  --monitoring-host=0.0.0.0 \
+  --monitoring-port={{ prysm_metrics_port | default(8080) }}{% if checkpoint_sync_url %} \
+  --checkpoint-sync-url={{ checkpoint_sync_url }}{% endif %}{% if builder_endpoint %} \
+  --http-mev-relay={{ builder_endpoint }}{% endif %}{% if consensus_fee_recipient %} \
+  --suggested-fee-recipient={{ consensus_fee_recipient }}{% endif %}{% if prysm_extra_args | default([]) | length > 0 %} \
+  {{ prysm_extra_args | join(' ') }}{% endif %}
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

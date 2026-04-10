@@ -1,0 +1,114 @@
+---
+# =============================================================================
+# Charon node bare-metal deployment
+# =============================================================================
+
+- name: Create charon-node directory
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/node-{{ node_index }}"
+    state: directory
+    mode: '0775'
+    owner: "{{ baremetal_user }}"
+    group: "{{ baremetal_group }}"
+  tags:
+    - charon
+    - charon-node
+    - setup
+
+- name: Copy validator_keys folder
+  ansible.builtin.copy:
+    remote_src: false
+    directory_mode: true
+    src: '{{ validator_keys_dir }}'
+    dest: "{{ ansible_env.HOME }}/node-{{ node_index }}/"
+    mode: '0600'
+    owner: "{{ baremetal_user }}"
+    group: "{{ baremetal_group }}"
+  tags:
+    - charon
+    - charon-node
+    - configuration
+    - keys
+
+- name: Copy charon-enr-private-key
+  ansible.builtin.copy:
+    remote_src: false
+    src: '{{ private_key_file }}'
+    dest: "{{ ansible_env.HOME }}/node-{{ node_index }}/"
+    mode: '0600'
+    owner: "{{ baremetal_user }}"
+    group: "{{ baremetal_group }}"
+  tags:
+    - charon
+    - charon-node
+    - configuration
+    - keys
+
+- name: Copy cluster-lock.json
+  ansible.builtin.copy:
+    remote_src: false
+    src: '{{ lock_file }}'
+    dest: "{{ ansible_env.HOME }}/node-{{ node_index }}/"
+    mode: '0644'
+    owner: "{{ baremetal_user }}"
+    group: "{{ baremetal_group }}"
+  tags:
+    - charon
+    - charon-node
+    - configuration
+
+# =============================================================================
+# Download charon binary
+# =============================================================================
+
+- name: Download charon binary
+  ansible.builtin.get_url:
+    url: "https://github.com/ObolNetwork/charon/releases/download/{{ node_image_version }}/charon-{{ node_image_version }}-linux-amd64"
+    dest: "{{ baremetal_bin_dir }}/charon"
+    mode: '0755'
+    owner: root
+    group: root
+  notify: restart charon
+  tags:
+    - charon
+    - charon-node
+    - deploy
+
+# =============================================================================
+# Deploy env file and systemd service
+# =============================================================================
+
+- name: Deploy charon environment file
+  ansible.builtin.template:
+    src: charon.env.j2
+    dest: "/etc/default/charon-{{ node_index }}"
+    mode: '0640'
+    owner: root
+    group: "{{ baremetal_group }}"
+  notify: restart charon
+  tags:
+    - charon
+    - charon-node
+    - configuration
+
+- name: Deploy charon systemd service
+  ansible.builtin.template:
+    src: charon.service.j2
+    dest: "/etc/systemd/system/charon-{{ node_index }}.service"
+    mode: '0644'
+  notify: restart charon
+  tags:
+    - charon
+    - charon-node
+    - deploy
+
+- name: Enable and start charon
+  ansible.builtin.systemd:
+    name: "charon-{{ node_index }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags:
+    - charon
+    - charon-node
+    - deploy

@@ -1,0 +1,330 @@
+---
+# =============================================================================
+# Validator client bare-metal deployment
+# =============================================================================
+
+- name: Set validator client defaults
+  ansible.builtin.set_fact:
+    validator_beacon_node_address: "{{ validator_beacon_node_address | default('http://127.0.0.1:3600') }}"
+    validator_keys_path: "{{ ansible_env.HOME }}/node-{{ node_index }}/validator_keys"
+  tags:
+    - validator
+    - validator-client
+    - configuration
+
+- name: Ensure validator client data directory exists
+  ansible.builtin.file:
+    path: "{{ validator_client_data_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ baremetal_user }}"
+    group: "{{ baremetal_group }}"
+  tags:
+    - validator
+    - validator-client
+    - setup
+
+# =============================================================================
+# Lighthouse VC
+# =============================================================================
+
+- name: Deploy Lighthouse validator client
+  when: validator_client == 'lighthouse'
+  tags:
+    - validator
+    - validator-client
+    - lighthouse
+    - deploy
+  block:
+    - name: Ensure Lighthouse binary exists
+      ansible.builtin.stat:
+        path: "{{ baremetal_bin_dir }}/lighthouse"
+      register: lighthouse_bin
+
+    - name: Download Lighthouse binary (if not present from beacon_node role)
+      ansible.builtin.get_url:
+        url: "https://github.com/sigp/lighthouse/releases/download/{{ vc_lighthouse_version }}/lighthouse-{{ vc_lighthouse_version }}-x86_64-unknown-linux-gnu.tar.gz"
+        dest: /tmp/lighthouse-vc.tar.gz
+        mode: '0644'
+      when: not lighthouse_bin.stat.exists
+
+    - name: Extract Lighthouse binary
+      ansible.builtin.unarchive:
+        src: /tmp/lighthouse-vc.tar.gz
+        dest: "{{ baremetal_bin_dir }}"
+        remote_src: true
+      when: not lighthouse_bin.stat.exists
+
+    - name: Import Lighthouse validator keys
+      ansible.builtin.shell: |
+        for f in {{ validator_keys_path }}/keystore-*.json; do
+          [ -f "$f" ] || continue
+          {{ baremetal_bin_dir }}/lighthouse --network {{ beacon_network }} account validator import \
+            --reuse-password \
+            --keystore "$f" \
+            --password-file "${f%.json}.txt" \
+            --datadir {{ validator_client_data_dir }}
+        done
+      changed_when: true
+
+    - name: Deploy Lighthouse VC systemd service
+      ansible.builtin.template:
+        src: vc-lighthouse.service.j2
+        dest: "/etc/systemd/system/vc-lighthouse-{{ node_index }}.service"
+        mode: '0644'
+      notify: restart lighthouse vc
+
+    - name: Enable and start Lighthouse VC
+      ansible.builtin.systemd:
+        name: "vc-lighthouse-{{ node_index }}"
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# =============================================================================
+# Nimbus VC
+# =============================================================================
+
+- name: Deploy Nimbus validator client
+  when: validator_client == 'nimbus'
+  tags:
+    - validator
+    - validator-client
+    - nimbus
+    - deploy
+  block:
+    - name: Ensure Nimbus validator client binary exists
+      ansible.builtin.stat:
+        path: "{{ baremetal_bin_dir }}/nimbus_validator_client"
+      register: nimbus_vc_bin
+
+    - name: Download Nimbus
+      ansible.builtin.get_url:
+        url: "https://github.com/status-im/nimbus-eth2/releases/download/{{ vc_nimbus_version }}/nimbus-eth2_Linux_amd64_{{ vc_nimbus_version | regex_replace('^multiarch-', '') }}.tar.gz"
+        dest: /tmp/nimbus-vc.tar.gz
+        mode: '0644'
+      when: not nimbus_vc_bin.stat.exists
+
+    - name: Create Nimbus extract directory
+      ansible.builtin.file:
+        path: /tmp/nimbus-vc-extract
+        state: directory
+        mode: '0755'
+      when: not nimbus_vc_bin.stat.exists
+
+    - name: Extract Nimbus
+      ansible.builtin.unarchive:
+        src: /tmp/nimbus-vc.tar.gz
+        dest: /tmp/nimbus-vc-extract
+        remote_src: true
+      when: not nimbus_vc_bin.stat.exists
+
+    - name: Install Nimbus validator client binary
+      ansible.builtin.copy:
+        src: "/tmp/nimbus-vc-extract/build/nimbus_validator_client"
+        dest: "{{ baremetal_bin_dir }}/nimbus_validator_client"
+        mode: '0755'
+        owner: root
+        group: root
+        remote_src: true
+      when: not nimbus_vc_bin.stat.exists
+
+    - name: Import Nimbus validator keys
+      ansible.builtin.shell: |
+        tmpkeys="{{ validator_keys_path }}/tmpkeys"
+        mkdir -p "${tmpkeys}"
+        for f in {{ validator_keys_path }}/keystore-*.json; do
+          [ -f "$f" ] || continue
+          password=$(<"${f//json/txt}")
+          cp "${f}" "${tmpkeys}"
+          echo "$password" | {{ baremetal_bin_dir }}/nimbus_beacon_node deposits import \
+            --data-dir={{ validator_client_data_dir }} \
+            "${tmpkeys}"
+          filename="$(basename ${f})"
+          rm "${tmpkeys}/${filename}"
+        done
+        rm -rf "${tmpkeys}"
+      changed_when: true
+
+    - name: Deploy Nimbus VC systemd service
+      ansible.builtin.template:
+        src: vc-nimbus.service.j2
+        dest: "/etc/systemd/system/vc-nimbus-{{ node_index }}.service"
+        mode: '0644'
+      notify: restart nimbus vc
+
+    - name: Enable and start Nimbus VC
+      ansible.builtin.systemd:
+        name: "vc-nimbus-{{ node_index }}"
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# =============================================================================
+# Prysm VC
+# =============================================================================
+
+- name: Deploy Prysm validator client
+  when: validator_client == 'prysm'
+  tags:
+    - validator
+    - validator-client
+    - prysm
+    - deploy
+  block:
+    - name: Download Prysm validator binary
+      ansible.builtin.get_url:
+        url: "https://github.com/prysmaticlabs/prysm/releases/download/{{ vc_prysm_version }}/validator-{{ vc_prysm_version }}-linux-amd64"
+        dest: "{{ baremetal_bin_dir }}/prysm-validator"
+        mode: '0755'
+      notify: restart prysm vc
+
+    - name: Create Prysm wallet
+      ansible.builtin.shell: |
+        WALLET_DIR="{{ validator_client_data_dir }}/wallet"
+        WALLET_PASSWORD="{{ prysm_wallet_password | default('prysm-validator-secret') }}"
+        echo "$WALLET_PASSWORD" > {{ validator_client_data_dir }}/wallet-password.txt
+        chmod 600 {{ validator_client_data_dir }}/wallet-password.txt
+        if [ ! -d "${WALLET_DIR}" ]; then
+          {{ baremetal_bin_dir }}/prysm-validator wallet create \
+            --accept-terms-of-use \
+            --wallet-password-file={{ validator_client_data_dir }}/wallet-password.txt \
+            --keymanager-kind=direct \
+            --wallet-dir="${WALLET_DIR}"
+        fi
+      changed_when: true
+
+    - name: Import Prysm validator keys
+      ansible.builtin.shell: |
+        WALLET_DIR="{{ validator_client_data_dir }}/wallet"
+        tmpkeys="{{ validator_keys_path }}/tmpkeys"
+        mkdir -p "${tmpkeys}"
+        for f in {{ validator_keys_path }}/keystore-*.json; do
+          [ -f "$f" ] || continue
+          cp "${f}" "${tmpkeys}"
+          {{ baremetal_bin_dir }}/prysm-validator accounts import \
+            --accept-terms-of-use=true \
+            --wallet-dir="${WALLET_DIR}" \
+            --keys-dir="${tmpkeys}" \
+            --account-password-file="${f//json/txt}" \
+            --wallet-password-file={{ validator_client_data_dir }}/wallet-password.txt
+          filename="$(basename ${f})"
+          rm "${tmpkeys}/${filename}"
+        done
+        rm -rf "${tmpkeys}"
+      changed_when: true
+
+    - name: Deploy Prysm VC systemd service
+      ansible.builtin.template:
+        src: vc-prysm.service.j2
+        dest: "/etc/systemd/system/vc-prysm-{{ node_index }}.service"
+        mode: '0644'
+      notify: restart prysm vc
+
+    - name: Enable and start Prysm VC
+      ansible.builtin.systemd:
+        name: "vc-prysm-{{ node_index }}"
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# =============================================================================
+# Lodestar VC
+# =============================================================================
+
+- name: Deploy Lodestar validator client
+  when: validator_client == 'lodestar'
+  tags:
+    - validator
+    - validator-client
+    - lodestar
+    - deploy
+  block:
+    - name: Ensure Lodestar is installed via npm
+      community.general.npm:
+        name: "@chainsafe/lodestar"
+        version: "{{ vc_lodestar_version }}"
+        global: true
+
+    - name: Import Lodestar validator keys
+      ansible.builtin.shell: |
+        KEYSTORES_DIR="{{ validator_client_data_dir }}/keystores"
+        SECRETS_DIR="{{ validator_client_data_dir }}/secrets"
+        mkdir -p "${KEYSTORES_DIR}" "${SECRETS_DIR}"
+        for f in {{ validator_keys_path }}/keystore-*.json; do
+          [ -f "$f" ] || continue
+          PUBKEY="0x$(grep '"pubkey"' "$f" | awk -F'"' '{print $4}')"
+          PUBKEY_DIR="${KEYSTORES_DIR}/${PUBKEY}"
+          [ -d "${PUBKEY_DIR}" ] && continue
+          mkdir -p "${PUBKEY_DIR}"
+          install -m 600 "$f" "${PUBKEY_DIR}/voting-keystore.json"
+          PASSWORD_FILE="${f%.json}.txt"
+          install -m 600 "${PASSWORD_FILE}" "${SECRETS_DIR}/${PUBKEY}"
+        done
+      changed_when: true
+
+    - name: Deploy Lodestar VC systemd service
+      ansible.builtin.template:
+        src: vc-lodestar.service.j2
+        dest: "/etc/systemd/system/vc-lodestar-{{ node_index }}.service"
+        mode: '0644'
+      notify: restart lodestar vc
+
+    - name: Enable and start Lodestar VC
+      ansible.builtin.systemd:
+        name: "vc-lodestar-{{ node_index }}"
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# =============================================================================
+# Teku VC
+# =============================================================================
+
+- name: Deploy Teku validator client
+  when: validator_client == 'teku'
+  tags:
+    - validator
+    - validator-client
+    - teku
+    - deploy
+  block:
+    - name: Ensure Teku binary exists
+      ansible.builtin.stat:
+        path: "{{ baremetal_bin_dir }}/teku"
+      register: teku_bin
+
+    - name: Download Teku
+      ansible.builtin.get_url:
+        url: "https://artifacts.consensys.net/public/teku/raw/names/teku.tar.gz/versions/{{ vc_teku_version }}/teku-{{ vc_teku_version }}.tar.gz"
+        dest: /tmp/teku-vc.tar.gz
+        mode: '0644'
+      when: not teku_bin.stat.exists
+
+    - name: Extract Teku
+      ansible.builtin.unarchive:
+        src: /tmp/teku-vc.tar.gz
+        dest: "{{ baremetal_data_dir }}"
+        remote_src: true
+      when: not teku_bin.stat.exists
+
+    - name: Symlink Teku binary
+      ansible.builtin.file:
+        src: "{{ baremetal_data_dir }}/teku-{{ vc_teku_version }}/bin/teku"
+        dest: "{{ baremetal_bin_dir }}/teku"
+        state: link
+      when: not teku_bin.stat.exists
+
+    - name: Deploy Teku VC systemd service
+      ansible.builtin.template:
+        src: vc-teku.service.j2
+        dest: "/etc/systemd/system/vc-teku-{{ node_index }}.service"
+        mode: '0644'
+      notify: restart teku vc
+
+    - name: Enable and start Teku VC
+      ansible.builtin.systemd:
+        name: "vc-teku-{{ node_index }}"
+        state: started
+        enabled: true
+        daemon_reload: true

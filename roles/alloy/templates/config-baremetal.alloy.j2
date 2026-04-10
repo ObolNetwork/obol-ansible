@@ -1,0 +1,168 @@
+loki.source.journal "systemd" {
+	forward_to    = [loki.write.default.receiver]
+	relabel_rules = loki.relabel.journal.rules
+	labels = {
+		job      = "systemd-journal",
+		instance = "{{ alloy_nickname }}",
+	}
+}
+
+loki.relabel "journal" {
+	forward_to = []
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		target_label  = "unit"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "charon-.*\\.service"
+		target_label  = "job"
+		replacement   = "charon"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "vc-lighthouse-.*\\.service"
+		target_label  = "job"
+		replacement   = "vc-lighthouse"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "vc-nimbus-.*\\.service"
+		target_label  = "job"
+		replacement   = "vc-nimbus"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "vc-prysm-.*\\.service"
+		target_label  = "job"
+		replacement   = "vc-prysm"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "vc-lodestar-.*\\.service"
+		target_label  = "job"
+		replacement   = "vc-lodestar"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "vc-teku-.*\\.service"
+		target_label  = "job"
+		replacement   = "vc-teku"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "geth\\.service"
+		target_label  = "job"
+		replacement   = "geth"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "nethermind\\.service"
+		target_label  = "job"
+		replacement   = "nethermind"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "besu\\.service"
+		target_label  = "job"
+		replacement   = "besu"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "reth\\.service"
+		target_label  = "job"
+		replacement   = "reth"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "lighthouse-beacon\\.service"
+		target_label  = "job"
+		replacement   = "lighthouse"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "teku-beacon\\.service"
+		target_label  = "job"
+		replacement   = "teku"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "lodestar-beacon\\.service"
+		target_label  = "job"
+		replacement   = "lodestar"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "nimbus-beacon\\.service"
+		target_label  = "job"
+		replacement   = "nimbus"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "prysm-beacon\\.service"
+		target_label  = "job"
+		replacement   = "prysm"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "grandine-beacon\\.service"
+		target_label  = "job"
+		replacement   = "grandine"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "mev-boost\\.service"
+		target_label  = "job"
+		replacement   = "mev-boost"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "prometheus\\.service"
+		target_label  = "job"
+		replacement   = "prometheus"
+	}
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		regex         = "alloy\\.service"
+		target_label  = "job"
+		replacement   = "alloy"
+	}
+
+{% if alloy_drop_unknown | default(true) %}
+	rule {
+		source_labels = ["job"]
+		regex         = "^$"
+		action        = "drop"
+	}
+{% endif %}
+}
+
+loki.write "default" {
+	endpoint {
+		url = "{{ alloy_loki_addresses }}"
+	}
+	external_labels = {
+		nickname = "{{ alloy_nickname }}",
+		host     = "{{ inventory_hostname }}",
+	}
+}

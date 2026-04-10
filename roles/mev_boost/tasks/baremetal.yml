@@ -1,0 +1,74 @@
+---
+# =============================================================================
+# MEV-Boost bare-metal deployment
+# =============================================================================
+
+- name: Validate mev-boost relays
+  ansible.builtin.assert:
+    that:
+      - mevboost_relays is defined
+      - mevboost_relays | length > 0
+    fail_msg: "mevboost_relays must be set when deploy_mev_boost is true"
+  tags:
+    - mev-boost
+    - mev
+    - validation
+
+- name: Normalize mev-boost relays
+  ansible.builtin.set_fact:
+    mevboost_relays_value: "{{ mevboost_relays if mevboost_relays is string else mevboost_relays | join(',') }}"
+  tags:
+    - mev-boost
+    - mev
+    - configuration
+
+# =============================================================================
+# Download mev-boost binary
+# =============================================================================
+
+- name: Download mev-boost binary
+  ansible.builtin.get_url:
+    url: "https://github.com/flashbots/mev-boost/releases/download/v{{ mevboost_version }}/mev-boost_{{ mevboost_version }}_linux_amd64.tar.gz"
+    dest: /tmp/mev-boost.tar.gz
+    mode: '0644'
+  tags:
+    - mev-boost
+    - mev
+    - deploy
+
+- name: Extract mev-boost binary
+  ansible.builtin.unarchive:
+    src: /tmp/mev-boost.tar.gz
+    dest: "{{ baremetal_bin_dir }}"
+    remote_src: true
+  notify: restart mev-boost
+  tags:
+    - mev-boost
+    - mev
+    - deploy
+
+# =============================================================================
+# Deploy systemd service
+# =============================================================================
+
+- name: Deploy mev-boost systemd service
+  ansible.builtin.template:
+    src: mev-boost.service.j2
+    dest: /etc/systemd/system/mev-boost.service
+    mode: '0644'
+  notify: restart mev-boost
+  tags:
+    - mev-boost
+    - mev
+    - deploy
+
+- name: Enable and start mev-boost
+  ansible.builtin.systemd:
+    name: mev-boost
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags:
+    - mev-boost
+    - mev
+    - deploy

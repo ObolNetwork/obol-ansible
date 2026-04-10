@@ -2,7 +2,7 @@
 
 - name: A playbook that creates a charon cluster
   hosts: all
-  gather_facts: false
+  gather_facts: true
   become: true
 
   pre_tasks:
@@ -11,15 +11,18 @@
       register: docker_valid
       ignore_errors: true
       changed_when: docker_valid != 0
+      when: deployment_mode | default('docker') == 'docker'
       tags:
         - always
 
   roles:
     - role: docker_install
+      when: deployment_mode | default('docker') == 'docker'
       tags:
         - docker
         - setup
     - role: docker_network
+      when: deployment_mode | default('docker') == 'docker'
       tags:
         - docker
         - network

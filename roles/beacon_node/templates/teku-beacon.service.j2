@@ -1,0 +1,34 @@
+[Unit]
+Description=Teku Beacon Node
+After=network-online.target
+Wants=network-online.target
+After={{ execution_client }}.service
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/teku \
+  --network={{ beacon_network }} \
+  --data-base-path={{ baremetal_data_dir }}/teku \
+  --p2p-port={{ teku_p2p_port }} \
+  --ee-endpoint=http://127.0.0.1:{{ execution_engine_port }} \
+  --ee-jwt-secret-file={{ beacon_jwt_file }} \
+  --rest-api-enabled=true \
+  --rest-api-interface=0.0.0.0 \
+  --rest-api-port={{ teku_http_port }} \
+  --rest-api-host-allowlist=* \
+  --metrics-enabled=true \
+  --metrics-interface=0.0.0.0 \
+  --metrics-port={{ teku_metrics_port }} \
+  --metrics-host-allowlist=*{% if checkpoint_sync_url %} \
+  --checkpoint-sync-url={{ checkpoint_sync_url }}{% endif %}{% if builder_endpoint %} \
+  --builder-endpoint={{ builder_endpoint }}{% endif %}{% if consensus_fee_recipient %} \
+  --validators-proposer-default-fee-recipient={{ consensus_fee_recipient }}{% endif %}{% if teku_extra_args | default([]) | length > 0 %} \
+  {{ teku_extra_args | join(' ') }}{% endif %}
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

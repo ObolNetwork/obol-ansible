@@ -1,0 +1,549 @@
+---
+# =============================================================================
+# Common setup
+# =============================================================================
+
+- name: Create obol system group
+  ansible.builtin.group:
+    name: "{{ baremetal_group }}"
+    system: true
+  tags:
+    - beacon
+    - beacon-node
+    - setup
+
+- name: Create obol system user
+  ansible.builtin.user:
+    name: "{{ baremetal_user }}"
+    group: "{{ baremetal_group }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+  tags:
+    - beacon
+    - beacon-node
+    - setup
+
+- name: Create beacon directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ baremetal_user }}"
+    group: "{{ baremetal_group }}"
+  loop:
+    - "{{ baremetal_data_dir }}"
+    - "{{ baremetal_data_dir }}/{{ execution_client }}"
+    - "{{ baremetal_data_dir }}/{{ consensus_client }}"
+    - "{{ beacon_jwt_dir }}"
+  tags:
+    - beacon
+    - beacon-node
+    - setup
+
+- name: Check JWT secret
+  ansible.builtin.stat:
+    path: "{{ beacon_jwt_file }}"
+  register: beacon_jwt_stat
+  tags:
+    - beacon
+    - beacon-node
+    - jwt
+
+- name: Generate JWT secret
+  ansible.builtin.shell: "openssl rand -hex 32 > {{ beacon_jwt_file }}"
+  when: not beacon_jwt_stat.stat.exists
+  changed_when: true
+  tags:
+    - beacon
+    - beacon-node
+    - jwt
+
+- name: Ensure JWT secret permissions
+  ansible.builtin.file:
+    path: "{{ beacon_jwt_file }}"
+    mode: '0644'
+    owner: "{{ baremetal_user }}"
+    group: "{{ baremetal_group }}"
+  tags:
+    - beacon
+    - beacon-node
+    - jwt
+
+- name: Resolve execution engine port
+  ansible.builtin.set_fact:
+    execution_engine_port: >-
+      {{ geth_engine_port if execution_client == 'geth'
+        else besu_engine_port if execution_client == 'besu'
+        else reth_engine_port if execution_client == 'reth'
+        else nethermind_engine_port }}
+  tags:
+    - beacon
+    - beacon-node
+    - execution
+    - configuration
+
+- name: Default builder endpoint to mev-boost when enabled
+  ansible.builtin.set_fact:
+    builder_endpoint: "http://127.0.0.1:{{ mevboost_port }}"
+  when:
+    - deploy_mev_boost | default(false)
+    - builder_endpoint | default('') == ''
+  tags:
+    - beacon
+    - beacon-node
+    - configuration
+
+# =============================================================================
+# Runtime dependencies
+# =============================================================================
+
+- name: Install Node.js (for Lodestar)
+  when: consensus_client == 'lodestar'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - lodestar
+    - dependencies
+  block:
+    - name: Add NodeSource repository
+      ansible.builtin.shell: |
+        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+      changed_when: true
+
+    - name: Install Node.js
+      ansible.builtin.apt:
+        name: nodejs
+        state: present
+        update_cache: true
+
+- name: Install Java 21 (for Teku/Besu)
+  when: execution_client in ['besu'] or consensus_client in ['teku']
+  tags:
+    - beacon
+    - beacon-node
+    - dependencies
+  block:
+    - name: Install OpenJDK 21
+      ansible.builtin.apt:
+        name: openjdk-21-jre-headless
+        state: present
+        update_cache: true
+
+# =============================================================================
+# Execution layer clients
+# =============================================================================
+
+# -- Geth --
+- name: Deploy Geth execution client
+  when: execution_client == 'geth'
+  tags:
+    - beacon
+    - beacon-node
+    - execution
+    - geth
+    - deploy
+  block:
+    - name: Get Geth release info
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/ethereum/go-ethereum/releases/tags/{{ geth_version }}"
+        return_content: true
+        headers:
+          Accept: application/vnd.github+json
+      register: geth_release
+
+    - name: Find Geth linux-amd64 asset
+      ansible.builtin.set_fact:
+        geth_download_url: "{{ geth_release.json.assets | selectattr('name', 'match', 'geth-linux-amd64.*\\.tar\\.gz$') | map(attribute='browser_download_url') | first }}"
+        geth_archive_name: "{{ geth_release.json.assets | selectattr('name', 'match', 'geth-linux-amd64.*\\.tar\\.gz$') | map(attribute='name') | first | regex_replace('\\.tar\\.gz$', '') }}"
+
+    - name: Download and extract Geth
+      ansible.builtin.unarchive:
+        src: "{{ geth_download_url }}"
+        dest: /tmp/
+        remote_src: true
+
+    - name: Install Geth binary
+      ansible.builtin.copy:
+        src: "/tmp/{{ geth_archive_name }}/geth"
+        dest: "{{ baremetal_bin_dir }}/geth"
+        mode: '0755'
+        owner: root
+        group: root
+        remote_src: true
+      notify: restart geth
+
+    - name: Deploy Geth systemd service
+      ansible.builtin.template:
+        src: geth.service.j2
+        dest: /etc/systemd/system/geth.service
+        mode: '0644'
+      notify: restart geth
+
+    - name: Enable and start Geth
+      ansible.builtin.systemd:
+        name: geth
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# -- Nethermind --
+- name: Deploy Nethermind execution client
+  when: execution_client == 'nethermind'
+  tags:
+    - beacon
+    - beacon-node
+    - execution
+    - nethermind
+    - deploy
+  block:
+    - name: Download Nethermind
+      ansible.builtin.get_url:
+        url: "https://github.com/NethermindEth/nethermind/releases/download/{{ nethermind_version }}/nethermind-{{ nethermind_version }}-linux-x64.zip"
+        dest: /tmp/nethermind.zip
+        mode: '0644'
+
+    - name: Create Nethermind directory
+      ansible.builtin.file:
+        path: "{{ baremetal_data_dir }}/nethermind-bin"
+        state: directory
+        mode: '0755'
+        owner: "{{ baremetal_user }}"
+        group: "{{ baremetal_group }}"
+
+    - name: Extract Nethermind
+      ansible.builtin.unarchive:
+        src: /tmp/nethermind.zip
+        dest: "{{ baremetal_data_dir }}/nethermind-bin"
+        remote_src: true
+      notify: restart nethermind
+
+    - name: Deploy Nethermind systemd service
+      ansible.builtin.template:
+        src: nethermind.service.j2
+        dest: /etc/systemd/system/nethermind.service
+        mode: '0644'
+      notify: restart nethermind
+
+    - name: Enable and start Nethermind
+      ansible.builtin.systemd:
+        name: nethermind
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# -- Reth --
+- name: Deploy Reth execution client
+  when: execution_client == 'reth'
+  tags:
+    - beacon
+    - beacon-node
+    - execution
+    - reth
+    - deploy
+  block:
+    - name: Download Reth
+      ansible.builtin.get_url:
+        url: "https://github.com/paradigmxyz/reth/releases/download/{{ reth_version }}/reth-{{ reth_version }}-x86_64-unknown-linux-gnu.tar.gz"
+        dest: /tmp/reth.tar.gz
+        mode: '0644'
+
+    - name: Extract Reth
+      ansible.builtin.unarchive:
+        src: /tmp/reth.tar.gz
+        dest: "{{ baremetal_bin_dir }}"
+        remote_src: true
+      notify: restart reth
+
+    - name: Deploy Reth systemd service
+      ansible.builtin.template:
+        src: reth.service.j2
+        dest: /etc/systemd/system/reth.service
+        mode: '0644'
+      notify: restart reth
+
+    - name: Enable and start Reth
+      ansible.builtin.systemd:
+        name: reth
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# -- Besu --
+- name: Deploy Besu execution client
+  when: execution_client == 'besu'
+  tags:
+    - beacon
+    - beacon-node
+    - execution
+    - besu
+    - deploy
+  block:
+    - name: Download Besu
+      ansible.builtin.get_url:
+        url: "https://github.com/hyperledger/besu/releases/download/{{ besu_version }}/besu-{{ besu_version }}.tar.gz"
+        dest: /tmp/besu.tar.gz
+        mode: '0644'
+
+    - name: Extract Besu
+      ansible.builtin.unarchive:
+        src: /tmp/besu.tar.gz
+        dest: "{{ baremetal_data_dir }}"
+        remote_src: true
+
+    - name: Symlink Besu binary
+      ansible.builtin.file:
+        src: "{{ baremetal_data_dir }}/besu-{{ besu_version }}/bin/besu"
+        dest: "{{ baremetal_bin_dir }}/besu"
+        state: link
+      notify: restart besu
+
+    - name: Deploy Besu systemd service
+      ansible.builtin.template:
+        src: besu.service.j2
+        dest: /etc/systemd/system/besu.service
+        mode: '0644'
+      notify: restart besu
+
+    - name: Enable and start Besu
+      ansible.builtin.systemd:
+        name: besu
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# =============================================================================
+# Consensus layer clients
+# =============================================================================
+
+# -- Lighthouse --
+- name: Deploy Lighthouse consensus client
+  when: consensus_client == 'lighthouse'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - lighthouse
+    - deploy
+  block:
+    - name: Download Lighthouse
+      ansible.builtin.get_url:
+        url: "https://github.com/sigp/lighthouse/releases/download/{{ lighthouse_version }}/lighthouse-{{ lighthouse_version }}-x86_64-unknown-linux-gnu.tar.gz"
+        dest: /tmp/lighthouse.tar.gz
+        mode: '0644'
+
+    - name: Extract Lighthouse
+      ansible.builtin.unarchive:
+        src: /tmp/lighthouse.tar.gz
+        dest: "{{ baremetal_bin_dir }}"
+        remote_src: true
+      notify: restart lighthouse
+
+    - name: Deploy Lighthouse systemd service
+      ansible.builtin.template:
+        src: lighthouse-beacon.service.j2
+        dest: /etc/systemd/system/lighthouse-beacon.service
+        mode: '0644'
+      notify: restart lighthouse
+
+    - name: Enable and start Lighthouse
+      ansible.builtin.systemd:
+        name: lighthouse-beacon
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# -- Nimbus --
+- name: Deploy Nimbus consensus client
+  when: consensus_client == 'nimbus'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - nimbus
+    - deploy
+  block:
+    - name: Download Nimbus
+      ansible.builtin.get_url:
+        url: "https://github.com/status-im/nimbus-eth2/releases/download/{{ nimbus_version }}/nimbus-eth2_Linux_amd64_{{ nimbus_version | regex_replace('^multiarch-', '') }}.tar.gz"
+        dest: /tmp/nimbus.tar.gz
+        mode: '0644'
+
+    - name: Create Nimbus extract directory
+      ansible.builtin.file:
+        path: /tmp/nimbus-extract
+        state: directory
+        mode: '0755'
+
+    - name: Extract Nimbus
+      ansible.builtin.unarchive:
+        src: /tmp/nimbus.tar.gz
+        dest: /tmp/nimbus-extract
+        remote_src: true
+
+    - name: Install Nimbus beacon node binary
+      ansible.builtin.copy:
+        src: "/tmp/nimbus-extract/build/nimbus_beacon_node"
+        dest: "{{ baremetal_bin_dir }}/nimbus_beacon_node"
+        mode: '0755'
+        owner: root
+        group: root
+        remote_src: true
+      notify: restart nimbus
+
+    - name: Deploy Nimbus systemd service
+      ansible.builtin.template:
+        src: nimbus-beacon.service.j2
+        dest: /etc/systemd/system/nimbus-beacon.service
+        mode: '0644'
+      notify: restart nimbus
+
+    - name: Enable and start Nimbus
+      ansible.builtin.systemd:
+        name: nimbus-beacon
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# -- Prysm --
+- name: Deploy Prysm consensus client
+  when: consensus_client == 'prysm'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - prysm
+    - deploy
+  block:
+    - name: Download Prysm beacon-chain
+      ansible.builtin.get_url:
+        url: "https://github.com/prysmaticlabs/prysm/releases/download/{{ prysm_version }}/beacon-chain-{{ prysm_version }}-linux-amd64"
+        dest: "{{ baremetal_bin_dir }}/prysm-beacon-chain"
+        mode: '0755'
+      notify: restart prysm
+
+    - name: Deploy Prysm systemd service
+      ansible.builtin.template:
+        src: prysm-beacon.service.j2
+        dest: /etc/systemd/system/prysm-beacon.service
+        mode: '0644'
+      notify: restart prysm
+
+    - name: Enable and start Prysm
+      ansible.builtin.systemd:
+        name: prysm-beacon
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# -- Lodestar --
+- name: Deploy Lodestar consensus client
+  when: consensus_client == 'lodestar'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - lodestar
+    - deploy
+  block:
+    - name: Install Lodestar globally via npm
+      community.general.npm:
+        name: "@chainsafe/lodestar"
+        version: "{{ lodestar_version }}"
+        global: true
+      notify: restart lodestar
+
+    - name: Deploy Lodestar systemd service
+      ansible.builtin.template:
+        src: lodestar-beacon.service.j2
+        dest: /etc/systemd/system/lodestar-beacon.service
+        mode: '0644'
+      notify: restart lodestar
+
+    - name: Enable and start Lodestar
+      ansible.builtin.systemd:
+        name: lodestar-beacon
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# -- Teku --
+- name: Deploy Teku consensus client
+  when: consensus_client == 'teku'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - teku
+    - deploy
+  block:
+    - name: Download Teku
+      ansible.builtin.get_url:
+        url: "https://artifacts.consensys.net/public/teku/raw/names/teku.tar.gz/versions/{{ teku_version }}/teku-{{ teku_version }}.tar.gz"
+        dest: /tmp/teku.tar.gz
+        mode: '0644'
+
+    - name: Extract Teku
+      ansible.builtin.unarchive:
+        src: /tmp/teku.tar.gz
+        dest: "{{ baremetal_data_dir }}"
+        remote_src: true
+
+    - name: Symlink Teku binary
+      ansible.builtin.file:
+        src: "{{ baremetal_data_dir }}/teku-{{ teku_version }}/bin/teku"
+        dest: "{{ baremetal_bin_dir }}/teku"
+        state: link
+      notify: restart teku
+
+    - name: Deploy Teku systemd service
+      ansible.builtin.template:
+        src: teku-beacon.service.j2
+        dest: /etc/systemd/system/teku-beacon.service
+        mode: '0644'
+      notify: restart teku
+
+    - name: Enable and start Teku
+      ansible.builtin.systemd:
+        name: teku-beacon
+        state: started
+        enabled: true
+        daemon_reload: true
+
+# -- Grandine --
+- name: Deploy Grandine consensus client
+  when: consensus_client == 'grandine'
+  tags:
+    - beacon
+    - beacon-node
+    - consensus
+    - grandine
+    - deploy
+  block:
+    - name: Download Grandine
+      ansible.builtin.get_url:
+        url: "https://github.com/grandinetech/grandine/releases/download/{{ grandine_version }}/grandine-{{ grandine_version }}-x86_64-unknown-linux-gnu.tar.gz"
+        dest: /tmp/grandine.tar.gz
+        mode: '0644'
+
+    - name: Extract Grandine
+      ansible.builtin.unarchive:
+        src: /tmp/grandine.tar.gz
+        dest: "{{ baremetal_bin_dir }}"
+        remote_src: true
+      notify: restart grandine
+
+    - name: Deploy Grandine systemd service
+      ansible.builtin.template:
+        src: grandine-beacon.service.j2
+        dest: /etc/systemd/system/grandine-beacon.service
+        mode: '0644'
+      notify: restart grandine
+
+    - name: Enable and start Grandine
+      ansible.builtin.systemd:
+        name: grandine-beacon
+        state: started
+        enabled: true
+        daemon_reload: true

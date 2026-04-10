@@ -1,0 +1,25 @@
+[Unit]
+Description=Nimbus Validator Client (node {{ node_index }})
+After=network-online.target
+Wants=network-online.target
+After=charon-{{ node_index }}.service
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/nimbus_validator_client \
+  --beacon-node={{ validator_beacon_node_address }} \
+  --data-dir={{ validator_client_data_dir }} \
+  --doppelganger-detection=false \
+  --metrics \
+  --metrics-address=0.0.0.0 \
+  --non-interactive \
+  --payload-builder={{ validator_builder_api_enabled | default('true') }} \
+  --distributed
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
