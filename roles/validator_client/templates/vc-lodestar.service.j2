@@ -1,0 +1,28 @@
+[Unit]
+Description=Lodestar Validator Client (node {{ node_index }})
+After=network-online.target
+Wants=network-online.target
+After=charon-{{ node_index }}.service
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart=/usr/bin/lodestar validator \
+  --network={{ beacon_network }} \
+  --dataDir={{ validator_client_data_dir }} \
+  --keystoresDir={{ validator_client_data_dir }}/keystores \
+  --secretsDir={{ validator_client_data_dir }}/secrets \
+  --beaconNodes={{ validator_beacon_node_address }} \
+  --metrics=true \
+  --metrics.address=0.0.0.0 \
+  --metrics.port=5064 \
+  --builder={{ validator_builder_api_enabled | default('true') }} \
+  --builder.selection={{ validator_builder_selection | default('builderalways') }} \
+  --distributed
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

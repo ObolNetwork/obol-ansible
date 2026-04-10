@@ -20,47 +20,114 @@ remote_write:
 scrape_configs:
   - job_name: "prometheus"
     static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:{{ prometheus_port }}"]
+{% else %}
       - targets: ["{{ prometheus_container_name }}:9090"]
+{% endif %}
   - job_name: "charon"
     static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:3620"]
+{% else %}
       - targets: {{ prometheus_charon_targets | to_json }}
+{% endif %}
 {% if execution_client == 'nethermind' %}
   - job_name: "nethermind"
     static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:8008"]
+{% else %}
       - targets: ["nethermind:8008"]
+{% endif %}
+{% endif %}
+{% if execution_client == 'geth' %}
+  - job_name: "geth"
+    static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:6060"]
+{% else %}
+      - targets: ["geth:6060"]
+{% endif %}
 {% endif %}
 {% if execution_client == 'reth' %}
   - job_name: "reth"
     static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:8008"]
+{% else %}
       - targets: ["reth:8008"]
+{% endif %}
+{% endif %}
+{% if execution_client == 'besu' %}
+  - job_name: "besu"
+    static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:9545"]
+{% else %}
+      - targets: ["besu:9545"]
+{% endif %}
 {% endif %}
 {% if consensus_client == 'lighthouse' %}
   - job_name: "lighthouse"
     static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:{{ lighthouse_metrics_port }}"]
+{% else %}
       - targets: ["lighthouse:{{ lighthouse_metrics_port }}"]
+{% endif %}
 {% endif %}
 {% if consensus_client == 'teku' %}
   - job_name: "teku"
     static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:{{ teku_metrics_port }}"]
+{% else %}
       - targets: ["teku:{{ teku_metrics_port }}"]
+{% endif %}
 {% endif %}
 {% if consensus_client == 'lodestar' %}
   - job_name: "lodestar"
     static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:{{ lodestar_metrics_port }}"]
+{% else %}
       - targets: ["lodestar:{{ lodestar_metrics_port }}"]
+{% endif %}
 {% endif %}
 {% if consensus_client == 'nimbus' %}
   - job_name: "nimbus"
     static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:{{ nimbus_metrics_port }}"]
+{% else %}
       - targets: ["nimbus:{{ nimbus_metrics_port }}"]
+{% endif %}
 {% endif %}
 {% if consensus_client == 'grandine' %}
   - job_name: "grandine"
     static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:{{ grandine_metrics_port }}"]
+{% else %}
       - targets: ["grandine:{{ grandine_metrics_port }}"]
+{% endif %}
+{% endif %}
+{% if consensus_client == 'prysm' %}
+  - job_name: "prysm"
+    static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:{{ prysm_metrics_port }}"]
+{% else %}
+      - targets: ["prysm:{{ prysm_metrics_port }}"]
+{% endif %}
 {% endif %}
 {% if deploy_mev_boost | default(false) and mevboost_metrics_port | default('') %}
   - job_name: "mev-boost"
     static_configs:
+{% if deployment_mode | default('docker') == 'baremetal' %}
+      - targets: ["127.0.0.1:{{ mevboost_metrics_port }}"]
+{% else %}
       - targets: ["{{ mevboost_container_name }}:{{ mevboost_metrics_port }}"]
+{% endif %}
 {% endif %}

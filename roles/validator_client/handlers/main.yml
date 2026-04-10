@@ -1,0 +1,30 @@
+---
+- name: restart lighthouse vc
+  ansible.builtin.systemd:
+    name: "vc-lighthouse-{{ node_index }}"
+    state: restarted
+    daemon_reload: true
+
+- name: restart nimbus vc
+  ansible.builtin.systemd:
+    name: "vc-nimbus-{{ node_index }}"
+    state: restarted
+    daemon_reload: true
+
+- name: restart prysm vc
+  ansible.builtin.systemd:
+    name: "vc-prysm-{{ node_index }}"
+    state: restarted
+    daemon_reload: true
+
+- name: restart lodestar vc
+  ansible.builtin.systemd:
+    name: "vc-lodestar-{{ node_index }}"
+    state: restarted
+    daemon_reload: true
+
+- name: restart teku vc
+  ansible.builtin.systemd:
+    name: "vc-teku-{{ node_index }}"
+    state: restarted
+    daemon_reload: true

@@ -1,0 +1,18 @@
+[Unit]
+Description=Charon Distributed Validator Client (node {{ node_index }})
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+EnvironmentFile=/etc/default/charon-{{ node_index }}
+ExecStart={{ baremetal_bin_dir }}/charon run
+WorkingDirectory={{ ansible_env.HOME }}/node-{{ node_index }}
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,24 @@
+[Unit]
+Description=Prysm Validator Client (node {{ node_index }})
+After=network-online.target
+Wants=network-online.target
+After=charon-{{ node_index }}.service
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/prysm-validator \
+  --accept-terms-of-use \
+  --beacon-rest-api-provider={{ validator_beacon_node_address }} \
+  --wallet-dir={{ validator_client_data_dir }}/wallet \
+  --wallet-password-file={{ validator_client_data_dir }}/wallet-password.txt \
+  --datadir={{ validator_client_data_dir }} \
+  --{{ beacon_network }} \
+  --enable-distributed
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

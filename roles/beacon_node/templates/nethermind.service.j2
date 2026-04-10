@@ -1,0 +1,29 @@
+[Unit]
+Description=Nethermind Execution Client
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_data_dir }}/nethermind-bin/nethermind \
+  --config={{ beacon_network }} \
+  --datadir={{ baremetal_data_dir }}/nethermind \
+  --HealthChecks.Enabled=true \
+  --JsonRpc.Enabled=true \
+  --JsonRpc.Host=0.0.0.0 \
+  --JsonRpc.Port={{ nethermind_http_port }} \
+  --JsonRpc.EngineHost=127.0.0.1 \
+  --JsonRpc.EnginePort={{ nethermind_engine_port }} \
+  --JsonRpc.JwtSecretFile={{ beacon_jwt_file }} \
+  --Metrics.Enabled=true \
+  --Metrics.ExposePort=8008 \
+  --Sync.SnapSync=true \
+  --History.Pruning=Rolling
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

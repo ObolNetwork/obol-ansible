@@ -1,0 +1,60 @@
+---
+- name: restart geth
+  ansible.builtin.systemd:
+    name: geth
+    state: restarted
+    daemon_reload: true
+
+- name: restart nethermind
+  ansible.builtin.systemd:
+    name: nethermind
+    state: restarted
+    daemon_reload: true
+
+- name: restart reth
+  ansible.builtin.systemd:
+    name: reth
+    state: restarted
+    daemon_reload: true
+
+- name: restart besu
+  ansible.builtin.systemd:
+    name: besu
+    state: restarted
+    daemon_reload: true
+
+- name: restart lighthouse
+  ansible.builtin.systemd:
+    name: lighthouse-beacon
+    state: restarted
+    daemon_reload: true
+
+- name: restart nimbus
+  ansible.builtin.systemd:
+    name: nimbus-beacon
+    state: restarted
+    daemon_reload: true
+
+- name: restart prysm
+  ansible.builtin.systemd:
+    name: prysm-beacon
+    state: restarted
+    daemon_reload: true
+
+- name: restart lodestar
+  ansible.builtin.systemd:
+    name: lodestar-beacon
+    state: restarted
+    daemon_reload: true
+
+- name: restart teku
+  ansible.builtin.systemd:
+    name: teku-beacon
+    state: restarted
+    daemon_reload: true
+
+- name: restart grandine
+  ansible.builtin.systemd:
+    name: grandine-beacon
+    state: restarted
+    daemon_reload: true

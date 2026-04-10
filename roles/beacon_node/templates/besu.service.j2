@@ -1,0 +1,31 @@
+[Unit]
+Description=Besu Execution Client
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/besu \
+  --network={{ beacon_network }} \
+  --data-path={{ baremetal_data_dir }}/besu \
+  --p2p-port={{ besu_p2p_port }} \
+  --rpc-http-enabled \
+  --rpc-http-host=0.0.0.0 \
+  --rpc-http-port={{ besu_http_port }} \
+  --rpc-http-api=ETH,NET,WEB3 \
+  --engine-rpc-enabled \
+  --engine-rpc-port={{ besu_engine_port }} \
+  --engine-jwt-secret={{ beacon_jwt_file }} \
+  --engine-host-allowlist=* \
+  --host-allowlist=* \
+  --metrics-enabled \
+  --metrics-host=0.0.0.0 \
+  --metrics-port=9545
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

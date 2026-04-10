@@ -2,7 +2,7 @@
 
 - name: A playbook that creates a charon node
   hosts: all
-  gather_facts: false
+  gather_facts: true
   become: true
 
   pre_tasks:
@@ -11,17 +11,22 @@
       register: docker_valid
       ignore_errors: true
       changed_when: docker_valid != 0
+      when: deployment_mode | default('docker') == 'docker'
       tags:
         - always
 
   roles:
     - name: Install Docker
-      when: docker_valid.failed
+      when:
+        - deployment_mode | default('docker') == 'docker'
+        - docker_valid is defined
+        - docker_valid.failed
       role: docker_install
       tags:
         - docker
         - setup
     - name: Ensure docker network
+      when: deployment_mode | default('docker') == 'docker'
       role: docker_network
       tags:
         - docker

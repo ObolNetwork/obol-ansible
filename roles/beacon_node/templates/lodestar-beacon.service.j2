@@ -1,0 +1,33 @@
+[Unit]
+Description=Lodestar Beacon Node
+After=network-online.target
+Wants=network-online.target
+After={{ execution_client }}.service
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart=/usr/bin/lodestar beacon \
+  --network={{ beacon_network }} \
+  --dataDir={{ baremetal_data_dir }}/lodestar \
+  --port={{ lodestar_p2p_port }} \
+  --execution.urls=http://127.0.0.1:{{ execution_engine_port }} \
+  --jwt-secret={{ beacon_jwt_file }} \
+  --rest \
+  --rest.address=0.0.0.0 \
+  --rest.port={{ lodestar_http_port }} \
+  --metrics \
+  --metrics.address=0.0.0.0 \
+  --metrics.port={{ lodestar_metrics_port }}{% if checkpoint_sync_url %} \
+  --checkpointSyncUrl={{ checkpoint_sync_url }}{% endif %}{% if builder_endpoint %} \
+  --builder \
+  --builder.url={{ builder_endpoint }}{% endif %}{% if consensus_fee_recipient %} \
+  --suggestedFeeRecipient={{ consensus_fee_recipient }}{% endif %}{% if lodestar_extra_args | default([]) | length > 0 %} \
+  {{ lodestar_extra_args | join(' ') }}{% endif %}
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

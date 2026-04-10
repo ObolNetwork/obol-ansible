@@ -1,0 +1,6 @@
+---
+- name: restart charon
+  ansible.builtin.systemd:
+    name: "charon-{{ node_index }}"
+    state: restarted
+    daemon_reload: true

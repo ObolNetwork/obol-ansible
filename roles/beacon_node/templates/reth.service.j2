@@ -1,0 +1,27 @@
+[Unit]
+Description=Reth Execution Client
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/reth node \
+  --full \
+  --chain={{ beacon_network }} \
+  --datadir={{ baremetal_data_dir }}/reth \
+  --port={{ reth_p2p_port }} \
+  --http \
+  --http.addr=0.0.0.0 \
+  --http.port={{ reth_http_port }} \
+  --authrpc.addr=127.0.0.1 \
+  --authrpc.port={{ reth_engine_port }} \
+  --authrpc.jwtsecret={{ beacon_jwt_file }} \
+  --metrics=0.0.0.0:8008
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

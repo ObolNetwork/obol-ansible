@@ -1,0 +1,17 @@
+[Unit]
+Description=Grafana Alloy Log Collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart={{ baremetal_bin_dir }}/alloy run {{ alloy_config_dir }}/config.alloy \
+  --storage.path={{ alloy_data_dir }}
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

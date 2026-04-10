@@ -1,0 +1,33 @@
+[Unit]
+Description=Lighthouse Beacon Node
+After=network-online.target
+Wants=network-online.target
+After={{ execution_client }}.service
+
+[Service]
+Type=simple
+User={{ baremetal_user }}
+Group={{ baremetal_group }}
+ExecStart={{ baremetal_bin_dir }}/lighthouse beacon_node \
+  --network={{ beacon_network }} \
+  --datadir={{ baremetal_data_dir }}/lighthouse \
+  --port={{ lighthouse_p2p_port }} \
+  --execution-endpoint=http://127.0.0.1:{{ execution_engine_port }} \
+  --execution-jwt={{ beacon_jwt_file }} \
+  --http \
+  --http-address=0.0.0.0 \
+  --http-port={{ lighthouse_http_port }} \
+  --metrics \
+  --metrics-address=0.0.0.0 \
+  --metrics-port={{ lighthouse_metrics_port }} \
+  --metrics-allow-origin="*"{% if checkpoint_sync_url %} \
+  --checkpoint-sync-url={{ checkpoint_sync_url }} \
+  --checkpoint-sync-url-timeout=600{% endif %}{% if builder_endpoint %} \
+  --builder={{ builder_endpoint }}{% endif %}{% if consensus_fee_recipient %} \
+  --suggested-fee-recipient={{ consensus_fee_recipient }}{% endif %}
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
