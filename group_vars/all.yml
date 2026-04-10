@@ -128,7 +128,7 @@ geth_http_port: 8545
 geth_engine_port: 8551
 
 besu_image: 'hyperledger/besu'
-besu_version: '26.2.0'
+besu_version: '26.4.0'
 besu_p2p_port: 30303
 besu_http_port: 8545
 besu_engine_port: 8551
