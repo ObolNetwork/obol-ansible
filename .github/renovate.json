@@ -6,19 +6,160 @@
   "semanticCommits": "enabled",
   "enabledManagers": [
     "github-actions",
-    "regex"
+    "custom.regex"
   ],
-  "regexManagers": [
+  "customManagers": [
     {
-      "fileMatch": [
-        "^group_vars/all\\.yml$"
-      ],
-      "matchStrings": [
-        "node_image_version:\\s*['\\\"]?v?(?<currentValue>[\\w.-]+)['\\\"]?"
-      ],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "ObolNetwork/charon",
-      "versioningTemplate": "semver"
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["node_image_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "obolnetwork/charon",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["geth_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "ethereum/client-go",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["nethermind_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "nethermind/nethermind",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["besu_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "hyperledger/besu",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["reth_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "ghcr.io/paradigmxyz/reth",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["lighthouse_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "sigp/lighthouse",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["teku_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "consensys/teku",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["lodestar_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "chainsafe/lodestar",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["nimbus_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "statusim/nimbus-eth2",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["prysm_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "gcr.io/prysmaticlabs/prysm/beacon-chain",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["grandine_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "sifrai/grandine",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["vc_lodestar_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "chainsafe/lodestar",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["vc_lighthouse_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "sigp/lighthouse",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["vc_nimbus_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "statusim/nimbus-validator-client",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["vc_prysm_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "offchainlabs/prysm-validator",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["vc_teku_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "consensys/teku",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["mevboost_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "flashbots/mev-boost",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["prometheus_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "prom/prometheus",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^group_vars/all\\.yml$"],
+      "matchStrings": ["alloy_version:\\s*['\"]?(?<currentValue>[^@\\s'\"]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?['\"]?"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "grafana/alloy",
+      "versioningTemplate": "docker"
     }
   ],
   "packageRules": [
@@ -42,15 +183,74 @@
     },
     {
       "matchManagers": [
-        "regex"
+        "custom.regex"
       ],
       "matchDepNames": [
-        "ObolNetwork/charon"
+        "obolnetwork/charon"
       ],
       "labels": [
         "renovate/charon"
       ],
       "groupName": "Charon image updates"
+    },
+    {
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "ethereum/client-go",
+        "nethermind/nethermind",
+        "hyperledger/besu",
+        "ghcr.io/paradigmxyz/reth"
+      ],
+      "labels": [
+        "renovate/execution-layer"
+      ],
+      "groupName": "Execution layer client updates"
+    },
+    {
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "sigp/lighthouse",
+        "consensys/teku",
+        "chainsafe/lodestar",
+        "statusim/nimbus-eth2",
+        "gcr.io/prysmaticlabs/prysm/beacon-chain",
+        "sifrai/grandine"
+      ],
+      "labels": [
+        "renovate/consensus-layer"
+      ],
+      "groupName": "Consensus layer client updates"
+    },
+    {
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "statusim/nimbus-validator-client",
+        "offchainlabs/prysm-validator"
+      ],
+      "labels": [
+        "renovate/validator-client"
+      ],
+      "groupName": "Validator client updates"
+    },
+    {
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "flashbots/mev-boost",
+        "prom/prometheus",
+        "grafana/alloy"
+      ],
+      "labels": [
+        "renovate/tools"
+      ],
+      "groupName": "Tool updates"
     }
   ]
 }

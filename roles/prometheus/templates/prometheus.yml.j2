@@ -1,0 +1,66 @@
+global:
+  scrape_interval: {{ prometheus_scrape_interval }}
+  evaluation_interval: {{ prometheus_evaluation_interval }}
+  external_labels:
+    service_owner: "{{ prom_service_owner }}"
+
+{% if prom_remote_write_enabled | default(false) %}
+remote_write:
+  - url: "{{ prom_remote_write_url }}"
+    authorization:
+      credentials: "{{ prom_remote_write_token }}"
+    {% if prom_remote_write_keep_job_regex %}
+    write_relabel_configs:
+      - source_labels: [job]
+        regex: "{{ prom_remote_write_keep_job_regex }}"
+        action: keep
+    {% endif %}
+
+{% endif %}
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["{{ prometheus_container_name }}:9090"]
+  - job_name: "charon"
+    static_configs:
+      - targets: {{ prometheus_charon_targets | to_json }}
+{% if execution_client == 'nethermind' %}
+  - job_name: "nethermind"
+    static_configs:
+      - targets: ["nethermind:8008"]
+{% endif %}
+{% if execution_client == 'reth' %}
+  - job_name: "reth"
+    static_configs:
+      - targets: ["reth:8008"]
+{% endif %}
+{% if consensus_client == 'lighthouse' %}
+  - job_name: "lighthouse"
+    static_configs:
+      - targets: ["lighthouse:{{ lighthouse_metrics_port }}"]
+{% endif %}
+{% if consensus_client == 'teku' %}
+  - job_name: "teku"
+    static_configs:
+      - targets: ["teku:{{ teku_metrics_port }}"]
+{% endif %}
+{% if consensus_client == 'lodestar' %}
+  - job_name: "lodestar"
+    static_configs:
+      - targets: ["lodestar:{{ lodestar_metrics_port }}"]
+{% endif %}
+{% if consensus_client == 'nimbus' %}
+  - job_name: "nimbus"
+    static_configs:
+      - targets: ["nimbus:{{ nimbus_metrics_port }}"]
+{% endif %}
+{% if consensus_client == 'grandine' %}
+  - job_name: "grandine"
+    static_configs:
+      - targets: ["grandine:{{ grandine_metrics_port }}"]
+{% endif %}
+{% if deploy_mev_boost | default(false) and mevboost_metrics_port | default('') %}
+  - job_name: "mev-boost"
+    static_configs:
+      - targets: ["{{ mevboost_container_name }}:{{ mevboost_metrics_port }}"]
+{% endif %}

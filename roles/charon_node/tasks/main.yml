@@ -3,6 +3,10 @@
     path: ~/node-{{ node_index }}
     state: directory
     mode: '775'
+  tags:
+    - charon
+    - charon-node
+    - setup
 
 - name: Copy validator_keys folder
   ansible.builtin.copy:
@@ -10,47 +14,78 @@
     directory_mode: true
     src: '{{ validator_keys_dir }}'
     dest: ~/node-{{ node_index }}/
-    mode: '777'
+    mode: '600'
+  tags:
+    - charon
+    - charon-node
+    - configuration
+    - keys
 
 - name: Copy charon-enr-private-key
   ansible.builtin.copy:
     remote_src: false
     src: '{{ private_key_file }}'
     dest: ~/node-{{ node_index }}/
-    mode: '777'
+    mode: '600'
+  tags:
+    - charon
+    - charon-node
+    - configuration
+    - keys
 
 - name: Copy cluster-lock.json
   ansible.builtin.copy:
     remote_src: false
     src: '{{ lock_file }}'
     dest: ~/node-{{ node_index }}/
-    mode: '777'
+    mode: '644'
+  tags:
+    - charon
+    - charon-node
+    - configuration
 
 - name: Retrieve full path of validator keys
   ansible.builtin.command: realpath ~/node-{{ node_index }}/validator_keys
   register: validator_keys
-  changed_when: validator_keys.stdout != ''
+  changed_when: false
+  tags:
+    - charon
+    - charon-node
+    - configuration
 
 - name: Retrieve full path of private key
   ansible.builtin.command: realpath ~/node-{{ node_index }}/charon-enr-private-key
   register: private_key
-  changed_when: private_key.stdout != ''
+  changed_when: false
+  tags:
+    - charon
+    - charon-node
+    - configuration
 
 - name: Retrieve full path of cluster lock
   ansible.builtin.command: realpath ~/node-{{ node_index }}/cluster-lock.json
   register: cluster_lock
-  changed_when: cluster_lock.stdout != ''
+  changed_when: false
+  tags:
+    - charon
+    - charon-node
+    - configuration
 
 - name: Pull default charon image
   community.docker.docker_image:
     name: obolnetwork/charon:{{ node_image_version }}
     source: pull
+  tags:
+    - charon
+    - charon-node
+    - docker
+    - pull
 
 - name: Create charon container
   community.docker.docker_container:
     image: obolnetwork/charon:{{ node_image_version }}
     name: 'charon-{{ node_index }}'
-    recreate: true
+    recreate: false
     command: run
     volumes:
       - '{{ validator_keys.stdout }}:/charon/validator_keys'
@@ -88,3 +123,9 @@
       - '3610'
     ports:
       - '3610:3610'
+    networks:
+      - name: "{{ docker_network_name }}"
+  tags:
+    - charon
+    - charon-node
+    - deploy

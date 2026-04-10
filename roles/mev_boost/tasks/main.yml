@@ -1,0 +1,48 @@
+- name: Ensure docker network exists
+  community.docker.docker_network:
+    name: "{{ docker_network_name }}"
+    state: present
+  tags:
+    - mev-boost
+    - mev
+    - network
+
+- name: Validate mev-boost relays
+  ansible.builtin.assert:
+    that:
+      - mevboost_relays is defined
+      - mevboost_relays | length > 0
+    fail_msg: "mevboost_relays must be set when deploy_mev_boost is true"
+  tags:
+    - mev-boost
+    - mev
+    - validation
+
+- name: Normalize mev-boost relays
+  ansible.builtin.set_fact:
+    mevboost_relays_value: "{{ mevboost_relays if mevboost_relays is string else mevboost_relays | join(',') }}"
+  tags:
+    - mev-boost
+    - mev
+    - configuration
+
+- name: Deploy mev-boost
+  community.docker.docker_container:
+    name: "{{ mevboost_container_name }}"
+    image: "{{ mevboost_image }}:{{ mevboost_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports: "{{ [mevboost_bind_address ~ ':' ~ mevboost_port ~ ':18550'] if mevboost_expose_port | default(false) else omit }}"
+    command: >-
+      -{{ beacon_network }}
+      -loglevel={{ mevboost_log_level }}
+      -addr=0.0.0.0:18550
+      {{ '-metrics -metrics-addr=0.0.0.0:' ~ mevboost_metrics_port if mevboost_metrics_port | default('') else '' }}
+      -relay-check
+      -relays={{ mevboost_relays_value }}
+    networks:
+      - name: "{{ docker_network_name }}"
+  tags:
+    - mev-boost
+    - mev
+    - deploy
