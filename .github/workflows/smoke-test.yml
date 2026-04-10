@@ -1,0 +1,310 @@
+name: Smoke Tests
+
+on:
+  pull_request:
+    paths:
+      - "roles/**"
+      - "group_vars/**"
+      - "charon-*.yml"
+      - ".github/workflows/smoke-test.yml"
+  push:
+    branches: [main]
+    paths:
+      - "roles/**"
+      - "group_vars/**"
+      - "charon-*.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Lighthouse CL (3 EL variants x 3 VC)
+          - { el: geth,       cl: lighthouse, cl_port: 5052, vc: lighthouse }
+          - { el: nethermind, cl: lighthouse, cl_port: 5052, vc: lodestar }
+          - { el: reth,       cl: lighthouse, cl_port: 5052, vc: nimbus }
+          # Teku CL (2 EL x 2 VC)
+          - { el: geth,       cl: teku,       cl_port: 5052, vc: teku }
+          - { el: nethermind, cl: teku,       cl_port: 5052, vc: prysm }
+          # Lodestar CL (2 EL x 2 VC)
+          - { el: geth,       cl: lodestar,   cl_port: 5052, vc: lighthouse }
+          - { el: nethermind, cl: lodestar,   cl_port: 5052, vc: lodestar }
+          # Nimbus CL (2 EL x 2 VC)
+          - { el: besu,       cl: nimbus,     cl_port: 5052, vc: nimbus }
+          - { el: nethermind, cl: nimbus,     cl_port: 5052, vc: teku }
+          # Prysm CL (1 EL x 2 VC)
+          - { el: geth,       cl: prysm,      cl_port: 3500, vc: prysm }
+          - { el: geth,       cl: prysm,      cl_port: 3500, vc: lighthouse }
+          # Grandine CL (1 EL x 2 VC)
+          - { el: nethermind, cl: grandine,   cl_port: 5052, vc: lodestar }
+          - { el: nethermind, cl: grandine,   cl_port: 5052, vc: nimbus }
+          # Extra coverage: remaining VC/CL combos not yet tested
+          - { el: geth,       cl: lighthouse, cl_port: 5052, vc: teku }
+          - { el: geth,       cl: lighthouse, cl_port: 5052, vc: prysm }
+          - { el: geth,       cl: teku,       cl_port: 5052, vc: nimbus }
+          - { el: geth,       cl: lodestar,   cl_port: 5052, vc: prysm }
+          - { el: besu,       cl: nimbus,     cl_port: 5052, vc: lodestar }
+
+    name: "${{ matrix.cl }}-${{ matrix.el }} (vc: ${{ matrix.vc }})"
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Install Ansible
+        run: pip install "ansible-core>=2.16,<2.18" "docker>=7,<8"
+
+      - name: Install Ansible collections
+        run: ansible-galaxy install -r requirements.yml
+
+      - name: Read Charon version
+        id: charon
+        run: |
+          VER=$(grep 'node_image_version' group_vars/all.yml | sed "s/.*'\(.*\)'/\1/")
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "Charon version: $VER"
+
+      - name: Generate Charon cluster artifacts
+        run: |
+          mkdir -p /tmp/charon
+          sudo chown 1000:1000 /tmp/charon
+          docker run --rm -v /tmp/charon:/data obolnetwork/charon:${{ steps.charon.outputs.version }} \
+            create cluster --cluster-dir=/data \
+            --name=smoke-test --nodes=3 --num-validators=1 \
+            --withdrawal-addresses=0x0000000000000000000000000000000000000000 \
+            --fee-recipient-addresses=0x0000000000000000000000000000000000000000 \
+            --network=hoodi --insecure-keys
+
+          # Copy node0 artifacts to expected location
+          sudo mkdir -p $HOME/.charon
+          sudo cp -r /tmp/charon/node0/* $HOME/.charon/
+          sudo chown -R $USER:$USER $HOME/.charon
+          echo "Artifacts:"
+          ls -la $HOME/.charon/
+          ls -la $HOME/.charon/validator_keys/
+
+      - name: Create test inventory
+        run: |
+          cat > test-hosts.yml << 'EOF'
+          all:
+            hosts:
+              localhost:
+                ansible_connection: local
+                ansible_user: runner
+          EOF
+
+      - name: Create extra vars file
+        run: |
+          cat > /tmp/smoke-vars.json << EOF
+          {
+            "beacon_node_endpoints": "http://${{ matrix.cl }}:${{ matrix.cl_port }}",
+            "deploy_beacon_node": true,
+            "execution_client": "${{ matrix.el }}",
+            "consensus_client": "${{ matrix.cl }}",
+            "beacon_network": "hoodi",
+            "deploy_validator_client": true,
+            "validator_client": "${{ matrix.vc }}",
+            "deploy_mev_boost": true,
+            "mevboost_relays": ["https://0xafa4c6985aa049fb79dd37010438cfebeb0f2bd42b115b89dd678dab0670c1de38da0c4e9138c9290a398ecd9a0b3110@boost-relay-hoodi.flashbots.net"],
+            "deploy_prometheus": true,
+            "deploy_alloy": true,
+            "alloy_loki_addresses": "http://localhost:3100/loki/api/v1/push",
+            "no_verify": "true",
+            "node_index": "0",
+            "validator_keys_dir": "${HOME}/.charon/validator_keys",
+            "private_key_file": "${HOME}/.charon/charon-enr-private-key",
+            "lock_file": "${HOME}/.charon/cluster-lock.json"
+          }
+          EOF
+          echo "Vars:"
+          cat /tmp/smoke-vars.json
+
+      - name: Run Ansible playbook
+        run: |
+          ansible-playbook -i test-hosts.yml charon-node.yml \
+            -e @/tmp/smoke-vars.json -v
+
+      - name: Wait for containers to stabilize
+        run: sleep 15
+
+      # ── Health Checks ──────────────────────────────────────────────
+
+      - name: "Check: Container status"
+        run: |
+          echo "Container status:"
+          docker ps -a --format "table {{.Names}}\t{{.Status}}"
+          echo ""
+          # Verify Ansible created all expected containers
+          EXPECTED="${{ matrix.el }} ${{ matrix.cl }} charon-0 mev-boost prometheus alloy vc-${{ matrix.vc }}-0"
+          MISSING=""
+          for svc in $EXPECTED; do
+            if ! docker ps -a --filter "name=$svc" --format '{{.Names}}' | grep -q "$svc"; then
+              MISSING="$MISSING $svc"
+            fi
+          done
+          if [ -n "$MISSING" ]; then
+            echo "::error::Ansible failed to create containers:$MISSING"
+            exit 1
+          fi
+
+          # Check container status (informational for CL/Charon/VC — they restart without synced BN)
+          echo ""
+          echo "| Container | Status | Expected |"
+          echo "|-----------|--------|----------|"
+          for svc in $(docker ps -a --format '{{.Names}}' | sort); do
+            ST=$(docker ps -a --filter "name=$svc" --format '{{.Status}}')
+            case "$svc" in
+              charon*) echo "| $svc | $ST | Exit (no synced BN) |" ;;
+              ${{ matrix.cl }}|vc-*) echo "| $svc | $ST | Up or Restarting (no synced BN) |" ;;
+              *) echo "| $svc | $ST | Up |" ;;
+            esac
+          done
+
+          # Fail only if infra containers (EL, MEV, Prometheus, Alloy) are down
+          INFRA_DOWN=""
+          for svc in ${{ matrix.el }} mev-boost prometheus alloy; do
+            ST=$(docker ps -a --filter "name=$svc" --format '{{.Status}}')
+            if echo "$ST" | grep -qE "Exited|Restarting"; then
+              INFRA_DOWN="$INFRA_DOWN $svc"
+              echo "--- $svc logs ---"
+              docker logs $svc 2>&1 | tail -10
+            fi
+          done
+          if [ -n "$INFRA_DOWN" ]; then
+            echo "::error::Infrastructure containers failed:$INFRA_DOWN"
+            exit 1
+          fi
+          echo ""
+          echo "All infrastructure containers healthy. CL/Charon/VC may restart (expected without synced BN)."
+
+      - name: "Health checks (via Docker network)"
+        run: |
+          CURL="docker run --rm --network dvnode curlimages/curl -sf"
+
+          echo "=== EL JSON-RPC ==="
+          $CURL -X POST -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}' \
+            http://${{ matrix.el }}:8545 && echo " EL: OK" || echo "::warning::EL RPC not responding"
+
+          echo "=== Charon ==="
+          $CURL http://charon-0:3620/livez && echo " Charon livez: OK" || echo "::notice::Charon livez not ready (expected — BN not synced)"
+          $CURL http://charon-0:3600/eth/v1/node/version && echo " Charon API: OK" || echo "::notice::Charon API not ready (expected — BN not synced)"
+
+          echo "=== MEV-boost ==="
+          $CURL http://mev-boost:18550/eth/v1/builder/status && echo " MEV-boost: OK" || echo "::warning::MEV-boost not responding"
+
+          echo "=== Prometheus ==="
+          $CURL http://prometheus:9090/-/healthy && echo " Prometheus: OK" || echo "::warning::Prometheus not healthy"
+
+          echo "=== Alloy ==="
+          docker ps --filter name=alloy --filter status=running --format '{{.Names}}' | grep -q alloy && echo " Alloy: OK" || echo "::warning::Alloy not running"
+
+      - name: "Check: Log analysis (detect startup errors)"
+        shell: python3 {0}
+        run: |
+          import subprocess, re, sys
+
+          containers = "${{ matrix.el }} ${{ matrix.cl }} mev-boost prometheus alloy".split()
+
+          ERROR_PATTERNS = [
+              r"Unknown option", r"unknown flag", r"Possible solutions:",
+              r"unrecognized option", r"invalid argument",
+              r"ENOENT", r"No such file or directory", r"File not accessible",
+              r"file not found", r"unable to open", r"[Pp]ermission denied",
+              r"Cannot find", r"could not load", r"Failed to load",
+              r"exec format error", r"OCI runtime", r"missing required",
+              r"panic:", r"segfault",
+          ]
+
+          EXCLUDE_PATTERNS = [
+              r"please use", r"Try .* --help", r"COMMAND .* --help",
+              r"use --help to see", r"Checkpoint sync recommended",
+              r"--help for more", r"for more information",
+              r"Smartcard socket not found",
+              r"pcscd.comm",
+              r"IPC endpoint opened",
+              r"disabling",
+          ]
+
+          error_re = re.compile("|".join(ERROR_PATTERNS), re.IGNORECASE)
+          exclude_re = re.compile("|".join(EXCLUDE_PATTERNS), re.IGNORECASE)
+
+          issues = []
+
+          for name in containers:
+              try:
+                  result = subprocess.run(
+                      ["docker", "logs", name], capture_output=True, text=True, timeout=10
+                  )
+                  logs = (result.stdout + result.stderr).split("\n")[-100:]
+              except Exception:
+                  continue
+
+              errors = []
+              for line in logs:
+                  if error_re.search(line) and not exclude_re.search(line):
+                      errors.append(line.strip())
+
+              if errors:
+                  unique = list(dict.fromkeys(errors))[:5]
+                  print(f"::error::{name} has startup errors:")
+                  for e in unique:
+                      print(f"  {e}")
+                  issues.append(name)
+
+          if issues:
+              print(f"\n::error::Containers with deployment errors: {' '.join(issues)}")
+              sys.exit(1)
+          print("No startup errors detected in container logs.")
+
+      # ── Report ──────────────────────────────────────────────────────
+
+      - name: Report
+        if: always()
+        run: |
+          exec > >(tee -a "$GITHUB_STEP_SUMMARY")
+          echo "## Smoke Test: ${{ matrix.cl }}-${{ matrix.el }} (vc: ${{ matrix.vc }})"
+          echo ""
+          echo "### Containers"
+          echo '```'
+          docker ps -a --format "table {{.Names}}\t{{.Status}}" 2>/dev/null
+          echo '```'
+          echo ""
+          echo "### Health"
+          echo "| Component | Status |"
+          echo "|-----------|--------|"
+          CURL="docker run --rm --network dvnode curlimages/curl -sf -o /dev/null -w %{http_code}"
+          EL=$($CURL -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}' http://${{ matrix.el }}:8545 2>/dev/null || echo "FAIL")
+          CHARON=$($CURL http://charon-0:3620/livez 2>/dev/null || echo "FAIL")
+          API=$($CURL http://charon-0:3600/eth/v1/node/version 2>/dev/null || echo "FAIL")
+          MEV=$($CURL http://mev-boost:18550/eth/v1/builder/status 2>/dev/null || echo "FAIL")
+          PROM=$($CURL http://prometheus:9090/-/healthy 2>/dev/null || echo "FAIL")
+          ALLOY=$(docker ps --filter name=alloy --filter status=running --format '{{.Names}}' | grep -q alloy && echo "UP" || echo "FAIL")
+          echo "| EL (${{ matrix.el }}) | $EL |"
+          echo "| Charon livez | $CHARON |"
+          echo "| Charon validator API | $API |"
+          echo "| MEV-boost | $MEV |"
+          echo "| Prometheus | $PROM |"
+          echo "| Alloy | $ALLOY |"
+          echo ""
+          echo "### Logs"
+          for c in $(docker ps -a --format '{{.Names}}' 2>/dev/null); do
+            echo "<details><summary>$c</summary>"
+            echo ""
+            echo '```'
+            docker logs $c 2>&1 | tail -15
+            echo '```'
+            echo "</details>"
+          done
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f $(docker ps -aq) 2>/dev/null || true
+          docker network rm dvnode 2>/dev/null || true

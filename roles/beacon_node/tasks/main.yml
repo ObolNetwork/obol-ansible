@@ -45,7 +45,7 @@
 - name: Ensure JWT secret permissions
   ansible.builtin.file:
     path: "{{ beacon_jwt_file }}"
-    mode: '0600'
+    mode: '0644'
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
   tags:
@@ -172,10 +172,10 @@
       --rpc-http-port=8545
       --rpc-http-api=ETH,NET,WEB3
       --engine-rpc-enabled
-      --engine-rpc-host=0.0.0.0
       --engine-rpc-port=8551
       --engine-jwt-secret=/var/lib/besu/jwt.hex
       --host-allowlist=*
+      --engine-host-allowlist=*
     volumes:
       - "{{ beacon_data_dir }}/besu:/var/lib/besu"
       - "{{ beacon_jwt_dir }}/jwt.hex:/var/lib/besu/jwt.hex"
@@ -397,6 +397,7 @@
       - "0.0.0.0:{{ prysm_p2p_port }}:13000/tcp"
       - "0.0.0.0:{{ prysm_p2p_port }}:13000/udp"
       - "127.0.0.1:{{ prysm_http_port }}:3500"
+      - "127.0.0.1:{{ prysm_metrics_port | default(8080) }}:8080"
     command: >
       --accept-terms-of-use
       --{{ beacon_network }}
@@ -405,6 +406,8 @@
       --datadir=/opt/app/beacon
       --grpc-gateway-host=0.0.0.0
       --grpc-gateway-port=3500
+      --monitoring-host=0.0.0.0
+      --monitoring-port=8080
       {% if checkpoint_sync_url %}--checkpoint-sync-url={{ checkpoint_sync_url }}{% endif %}
       {% if builder_endpoint %}--http-mev-relay={{ builder_endpoint }}{% endif %}
       {% if consensus_fee_recipient %}--suggested-fee-recipient={{ consensus_fee_recipient }}{% endif %}

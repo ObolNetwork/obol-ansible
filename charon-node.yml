@@ -29,13 +29,13 @@
         - setup
     - name: Deploy mev-boost
       role: mev_boost
-      when: deploy_mev_boost | default(false)
+      when: deploy_mev_boost | default(false) | bool
       tags:
         - mev-boost
         - mev
     - name: Deploy beacon node pair
       role: beacon_node
-      when: deploy_beacon_node | default(false)
+      when: deploy_beacon_node | default(false) | bool
       tags:
         - beacon
         - beacon-node
@@ -48,19 +48,19 @@
         - charon-node
     - name: Deploy validator client
       role: validator_client
-      when: deploy_validator_client | default(false)
+      when: deploy_validator_client | default(false) | bool
       tags:
         - validator
         - validator-client
     - name: Deploy Prometheus
       role: prometheus
-      when: deploy_prometheus | default(false)
+      when: deploy_prometheus | default(false) | bool
       tags:
         - prometheus
         - monitoring
     - name: Deploy Alloy
       role: alloy
-      when: deploy_alloy | default(false)
+      when: deploy_alloy | default(false) | bool
       tags:
         - alloy
         - logging

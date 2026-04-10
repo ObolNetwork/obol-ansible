@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Cleanup nimbus directories if they already exist.
-rm -rf /home/user/data
+rm -rf /home/user/data/validators /home/user/data/db
 
 # Running a nimbus VC involves two steps which need to run in order:
 # 1. Importing the validator keys

@@ -28,6 +28,7 @@ exec lighthouse --network "${NETWORK}" validator \
     --metrics \
     --metrics-address "0.0.0.0" \
     --metrics-port "${LIGHTHOUSE_METRICS_PORT}" \
+    --init-slashing-protection \
     --use-long-timeouts \
     --distributed \
     ${builder_args}

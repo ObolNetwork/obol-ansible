@@ -198,7 +198,7 @@
       NETWORK: "{{ beacon_network }}"
       BUILDER_API_ENABLED: "{{ validator_builder_api_enabled }}"
       FEE_RECIPIENT: "{{ validator_fee_recipient }}"
-      LIGHTHOUSE_METRICS_PORT: "{{ vc_lighthouse_metrics_port }}"
+      LIGHTHOUSE_METRICS_PORT: "{{ vc_lighthouse_metrics_port | string }}"
     volumes:
       - "{{ validator_client_data_dir }}/lighthouse-run.sh:/opt/lighthouse/run.sh"
       - "{{ validator_keys_path }}:/opt/charon/validator_keys"

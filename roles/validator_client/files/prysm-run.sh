@@ -9,8 +9,9 @@ mkdir $WALLET_DIR
 # Running a prysm VC involves two steps which need to run in order:
 # 1. Import validator keys in a prysm wallet account.
 # 2. Run the validator client.
-WALLET_PASSWORD="prysm-validator-secret"
+WALLET_PASSWORD="${PRYSM_WALLET_PASSWORD:-prysm-validator-secret}"
 echo $WALLET_PASSWORD > /wallet-password.txt
+chmod 600 /wallet-password.txt
 /app/cmd/validator/validator wallet create --accept-terms-of-use --wallet-password-file=wallet-password.txt --keymanager-kind=direct --wallet-dir="$WALLET_DIR"
 
 tmpkeys="/home/charon/validator_keys/tmpkeys"
@@ -41,12 +42,10 @@ rm -r ${tmpkeys}
 echo "Imported all keys"
 
 # Now run prysm VC
-/app/cmd/validator/validator --wallet-dir="$WALLET_DIR" \
+exec /app/cmd/validator/validator --wallet-dir="$WALLET_DIR" \
     --accept-terms-of-use=true \
     --datadir="/data/vc" \
     --wallet-password-file="/wallet-password.txt" \
-    --enable-beacon-rest-api \
     --beacon-rest-api-provider="${BEACON_NODE_ADDRESS}" \
-    --beacon-rpc-provider="${BEACON_NODE_ADDRESS}" \
     --"${NETWORK}" \
     --distributed
