@@ -1,8 +1,10 @@
 - name: Create charon-node directory
   ansible.builtin.file:
-    path: ~/node-{{ node_index }}
+    path: "{{ validator_base_dir }}"
     state: directory
-    mode: '775'
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
   tags:
     - charon
     - charon-node
@@ -13,8 +15,10 @@
     remote_src: false
     directory_mode: true
     src: '{{ validator_keys_dir }}'
-    dest: ~/node-{{ node_index }}/
-    mode: '600'
+    dest: "{{ validator_base_dir }}/"
+    mode: '0600'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
   tags:
     - charon
     - charon-node
@@ -25,8 +29,10 @@
   ansible.builtin.copy:
     remote_src: false
     src: '{{ private_key_file }}'
-    dest: ~/node-{{ node_index }}/
-    mode: '600'
+    dest: "{{ validator_base_dir }}/"
+    mode: '0600'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
   tags:
     - charon
     - charon-node
@@ -37,35 +43,10 @@
   ansible.builtin.copy:
     remote_src: false
     src: '{{ lock_file }}'
-    dest: ~/node-{{ node_index }}/
-    mode: '644'
-  tags:
-    - charon
-    - charon-node
-    - configuration
-
-- name: Retrieve full path of validator keys
-  ansible.builtin.command: realpath ~/node-{{ node_index }}/validator_keys
-  register: validator_keys
-  changed_when: false
-  tags:
-    - charon
-    - charon-node
-    - configuration
-
-- name: Retrieve full path of private key
-  ansible.builtin.command: realpath ~/node-{{ node_index }}/charon-enr-private-key
-  register: private_key
-  changed_when: false
-  tags:
-    - charon
-    - charon-node
-    - configuration
-
-- name: Retrieve full path of cluster lock
-  ansible.builtin.command: realpath ~/node-{{ node_index }}/cluster-lock.json
-  register: cluster_lock
-  changed_when: false
+    dest: "{{ validator_base_dir }}/"
+    mode: '0640'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
   tags:
     - charon
     - charon-node
@@ -88,9 +69,9 @@
     recreate: false
     command: run
     volumes:
-      - '{{ validator_keys.stdout }}:/charon/validator_keys'
-      - '{{ private_key.stdout }}:/charon/charon-enr-private-key'
-      - '{{ cluster_lock.stdout }}:/charon/cluster-lock.json'
+      - '{{ validator_base_dir }}/validator_keys:/charon/validator_keys'
+      - '{{ validator_base_dir }}/charon-enr-private-key:/charon/charon-enr-private-key'
+      - '{{ validator_base_dir }}/cluster-lock.json:/charon/cluster-lock.json'
     env:
       CHARON_BEACON_NODE_ENDPOINTS: '{{ beacon_node_endpoints | default(omit) }}'
       CHARON_BUILDER_API: '{{ builder_api | default(omit) }}'
