@@ -134,7 +134,7 @@ besu_http_port: 8545
 besu_engine_port: 8551
 
 reth_image: 'ghcr.io/paradigmxyz/reth'
-reth_version: 'v1.11.3'
+reth_version: 'v2.2.0'
 reth_p2p_port: 30303
 reth_http_port: 8545
 reth_engine_port: 8551
