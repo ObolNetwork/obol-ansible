@@ -220,7 +220,7 @@ mevboost_relays: []
 deploy_prometheus: false
 prometheus_container_name: 'prometheus'
 prometheus_image: 'prom/prometheus'
-prometheus_version: 'v3.11.2'
+prometheus_version: 'v3.11.3'
 prometheus_user: 'root'
 prometheus_config_dir: "/home/{{ ansible_user }}/prometheus"
 prometheus_data_dir: "{{ prometheus_config_dir }}/data"
@@ -241,7 +241,7 @@ prometheus_charon_targets:
 deploy_alloy: false
 alloy_container_name: 'alloy'
 alloy_image: 'grafana/alloy'
-alloy_version: 'v1.15.1'
+alloy_version: 'v1.16.0'
 alloy_config_dir: '/etc/alloy'
 alloy_data_dir: '/var/lib/alloy'
 alloy_docker_host: 'unix:///var/run/docker.sock'
