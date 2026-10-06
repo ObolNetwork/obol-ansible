@@ -197,7 +197,7 @@ vc_lighthouse_metrics_port: 5064
 vc_nimbus_image: 'statusim/nimbus-validator-client'
 vc_nimbus_version: 'multiarch-v26.3.1'
 vc_prysm_image: 'offchainlabs/prysm-validator'
-vc_prysm_version: 'v7.1.3'
+vc_prysm_version: 'v7.2.1'
 vc_teku_image: 'consensys/teku'
 vc_teku_version: '26.4.0'
 
