@@ -116,7 +116,7 @@ beacon_jwt_file: "{{ beacon_jwt_dir }}/jwt.hex"
 
 # Execution clients
 nethermind_image: 'nethermind/nethermind'
-nethermind_version: '1.36.2'
+nethermind_version: '2.1.0'
 nethermind_p2p_port: 30303
 nethermind_http_port: 8545
 nethermind_engine_port: 8551
