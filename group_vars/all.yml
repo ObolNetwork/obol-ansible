@@ -116,25 +116,25 @@ beacon_jwt_file: "{{ beacon_jwt_dir }}/jwt.hex"
 
 # Execution clients
 nethermind_image: 'nethermind/nethermind'
-nethermind_version: '1.36.2'
+nethermind_version: '1.39.3'
 nethermind_p2p_port: 30303
 nethermind_http_port: 8545
 nethermind_engine_port: 8551
 
 geth_image: 'ethereum/client-go'
-geth_version: 'v1.17.2'
+geth_version: 'v1.17.8'
 geth_p2p_port: 30303
 geth_http_port: 8545
 geth_engine_port: 8551
 
 besu_image: 'hyperledger/besu'
-besu_version: '26.4.0'
+besu_version: '26.9.0'
 besu_p2p_port: 30303
 besu_http_port: 8545
 besu_engine_port: 8551
 
 reth_image: 'ghcr.io/paradigmxyz/reth'
-reth_version: 'v2.2.0'
+reth_version: 'v2.7.0'
 reth_p2p_port: 30303
 reth_http_port: 8545
 reth_engine_port: 8551
