@@ -15,4 +15,4 @@ jobs:
           fetch-depth: 0
 
       - name: Run ansible-lint
-        uses: ansible/ansible-lint@5fac056c45595896c973fbde871f01f6cb14d74c # v26
+        uses: ansible/ansible-lint@b74fb6f73d234bf92672372cb1c10768e4018d16 # v26
